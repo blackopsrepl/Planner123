@@ -90,6 +90,11 @@ pub enum GoogleCommand {
         action: GoogleCalendarCommand,
     },
     Sync(GoogleSyncArgs),
+    SyncStatus(GoogleSyncStatusArgs),
+    Conflicts {
+        #[command(subcommand)]
+        action: GoogleConflictCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -103,6 +108,12 @@ pub enum GoogleAuthCommand {
 pub enum GoogleCalendarCommand {
     Discover,
     Import(GoogleCalendarImportArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum GoogleConflictCommand {
+    List,
+    Resolve(GoogleConflictResolveArgs),
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -299,6 +310,25 @@ pub struct GoogleCalendarImportArgs {
     position: Option<i64>,
 }
 
+#[derive(Debug, Args)]
+pub struct GoogleSyncStatusArgs {
+    #[arg(long)]
+    calendar_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ConflictStrategyArg {
+    KeepLocal,
+    KeepRemote,
+}
+
+#[derive(Debug, Args)]
+pub struct GoogleConflictResolveArgs {
+    id: String,
+    #[arg(long, value_enum)]
+    strategy: ConflictStrategyArg,
+}
+
 #[derive(Debug, Clone)]
 pub struct CliError {
     pub code: &'static str,
@@ -375,6 +405,10 @@ struct SyncCalendarData {
     google_id: Option<String>,
     events_added: usize,
     events_updated: usize,
+    pushed_creates: usize,
+    pushed_updates: usize,
+    pushed_deletes: usize,
+    conflicts_detected: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -798,6 +832,8 @@ fn handle_google_with_backend(
     match action {
         GoogleCommand::Auth { action } => handle_google_auth(action),
         GoogleCommand::Calendars { action } => handle_google_calendars(conn, action),
+        GoogleCommand::SyncStatus(args) => handle_google_sync_status(conn, args),
+        GoogleCommand::Conflicts { action } => handle_google_conflicts(conn, action),
         GoogleCommand::Sync(args) => {
             let mut calendars: Vec<_> = db::load_calendars(conn)
                 .map_err(internal_error)?
@@ -822,17 +858,23 @@ fn handle_google_with_backend(
             let mut results = Vec::with_capacity(calendars.len());
             let mut total_added = 0usize;
             let mut total_updated = 0usize;
+            let mut total_conflicts = 0usize;
 
             for calendar in &calendars {
-                let (added, updated) = google_sync_backend.sync_calendar(&rt, conn, calendar)?;
-                total_added += added;
-                total_updated += updated;
+                let report = google_sync_backend.sync_calendar(&rt, conn, calendar)?;
+                total_added += report.events_added;
+                total_updated += report.events_updated + report.pushed_updates;
+                total_conflicts += report.conflicts_detected;
                 results.push(SyncCalendarData {
                     calendar_id: calendar.id.clone(),
                     calendar_name: calendar.name.clone(),
                     google_id: calendar.google_id.clone(),
-                    events_added: added,
-                    events_updated: updated,
+                    events_added: report.events_added,
+                    events_updated: report.events_updated + report.pushed_updates,
+                    pushed_creates: report.pushed_creates,
+                    pushed_updates: report.pushed_updates,
+                    pushed_deletes: report.pushed_deletes,
+                    conflicts_detected: report.conflicts_detected,
                 });
             }
 
@@ -840,6 +882,7 @@ fn handle_google_with_backend(
                 "calendars_synced": results.len(),
                 "events_added": total_added,
                 "events_updated": total_updated,
+                "conflicts_detected": total_conflicts,
                 "results": results,
             }))
         }
@@ -922,6 +965,61 @@ fn handle_google_calendars(
     }
 }
 
+fn handle_google_sync_status(
+    conn: &Connection,
+    args: GoogleSyncStatusArgs,
+) -> Result<Value, CliError> {
+    let mut calendars: Vec<_> = db::load_calendars(conn)
+        .map_err(internal_error)?
+        .into_iter()
+        .filter(|calendar| calendar.source == models::CalendarSource::Google)
+        .collect();
+    if let Some(calendar_id) = args.calendar_id.as_deref() {
+        calendars.retain(|calendar| calendar.id == calendar_id);
+        if calendars.is_empty() {
+            return Err(CliError::not_found("google calendar", calendar_id));
+        }
+    }
+
+    let status = calendars
+        .iter()
+        .map(|calendar| crate::sync::engine::sync_status(conn, calendar).map_err(internal_error))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(json!(status))
+}
+
+fn handle_google_conflicts(
+    conn: &Connection,
+    action: GoogleConflictCommand,
+) -> Result<Value, CliError> {
+    match action {
+        GoogleConflictCommand::List => {
+            let conflicts =
+                crate::sync::conflicts::list_pending_conflicts(conn).map_err(internal_error)?;
+            Ok(json!(conflicts))
+        }
+        GoogleConflictCommand::Resolve(args) => {
+            let strategy = match args.strategy {
+                ConflictStrategyArg::KeepLocal => {
+                    crate::sync::state::ConflictResolutionStrategy::KeepLocal
+                }
+                ConflictStrategyArg::KeepRemote => {
+                    crate::sync::state::ConflictResolutionStrategy::KeepRemote
+                }
+            };
+            let resolved = crate::sync::conflicts::resolve_conflict(conn, &args.id, strategy)
+                .map_err(|error| {
+                    if error.to_string().contains("not found") {
+                        CliError::not_found("conflict", &args.id)
+                    } else {
+                        CliError::internal(error.to_string())
+                    }
+                })?;
+            Ok(json!(resolved))
+        }
+    }
+}
+
 fn discover_google_calendars() -> Result<Vec<google::discovery::DiscoveredGoogleCalendar>, CliError>
 {
     if let Some(discovered) = google_discovery_override()? {
@@ -948,7 +1046,7 @@ trait GoogleSyncBackend {
         runtime: &tokio::runtime::Runtime,
         conn: &Connection,
         calendar: &models::Calendar,
-    ) -> Result<(usize, usize), CliError>;
+    ) -> Result<google::sync::SyncCalendarReport, CliError>;
 }
 
 struct RealGoogleSyncBackend;
@@ -959,30 +1057,26 @@ impl GoogleSyncBackend for RealGoogleSyncBackend {
         runtime: &tokio::runtime::Runtime,
         conn: &Connection,
         calendar: &models::Calendar,
-    ) -> Result<(usize, usize), CliError> {
+    ) -> Result<google::sync::SyncCalendarReport, CliError> {
         if let Some(result) = google_sync_override_result(calendar)? {
-            return result;
+            let (added, updated) = result?;
+            return Ok(google::sync::SyncCalendarReport {
+                events_added: added,
+                events_updated: updated,
+                ..Default::default()
+            });
         }
         let client = google::auth::GoogleClient::from_keyring().ok_or_else(|| {
             CliError::external("google credentials are not configured in keyring")
         })?;
-        let sync_token = db::get_sync_token(conn, &calendar.id).map_err(internal_error)?;
-        let delta = runtime
-            .block_on(google::sync::fetch_calendar_delta(
-                &client,
-                calendar,
-                sync_token.as_deref(),
-            ))
+        runtime
+            .block_on(google::sync::sync_calendar(&client, calendar))
             .with_context(|| format!("sync failed for calendar '{}'", calendar.name))
-            .map_err(|e| CliError::external(e.to_string()))?;
-        google::sync::apply_calendar_sync(conn, calendar, delta)
-            .with_context(|| {
-                format!(
-                    "failed to persist sync results for calendar '{}'",
-                    calendar.name
-                )
+            .map_err(|e| {
+                let _ =
+                    crate::sync::engine::mark_calendar_sync_error(conn, calendar, &e.to_string());
+                CliError::external(e.to_string())
             })
-            .map_err(|e| CliError::external(e.to_string()))
     }
 }
 
@@ -1367,11 +1461,17 @@ mod tests {
             _runtime: &tokio::runtime::Runtime,
             _conn: &Connection,
             calendar: &models::Calendar,
-        ) -> Result<(usize, usize), CliError> {
-            self.results_by_calendar_id
+        ) -> Result<google::sync::SyncCalendarReport, CliError> {
+            let (added, updated) = self
+                .results_by_calendar_id
                 .get(&calendar.id)
                 .cloned()
-                .unwrap_or_else(|| self.default_result.clone())
+                .unwrap_or_else(|| self.default_result.clone())?;
+            Ok(google::sync::SyncCalendarReport {
+                events_added: added,
+                events_updated: updated,
+                ..Default::default()
+            })
         }
     }
 

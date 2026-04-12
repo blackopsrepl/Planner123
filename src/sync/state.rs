@@ -426,6 +426,19 @@ pub fn load_conflicts(conn: &Connection, pending_only: bool) -> Result<Vec<SyncC
         .map_err(Into::into)
 }
 
+pub fn get_conflict(conn: &Connection, conflict_id: &str) -> Result<Option<SyncConflict>> {
+    conn.query_row(
+        "SELECT id, event_id, calendar_id, local_snapshot, remote_snapshot, remote_etag,
+                detected_at, resolution_status, resolution_strategy, resolved_at
+         FROM sync_conflicts
+         WHERE id = ?1",
+        [conflict_id],
+        map_conflict_row,
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
 pub fn insert_conflict(conn: &Connection, conflict: &SyncConflict) -> Result<()> {
     conn.execute(
         "INSERT INTO sync_conflicts

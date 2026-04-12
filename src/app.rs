@@ -392,15 +392,22 @@ impl App {
             WorkerResult::GoogleSyncComplete {
                 events_added,
                 events_updated,
+                conflicts_detected,
             } => {
-                self.set_status(
+                let status = if conflicts_detected > 0 {
+                    format!(
+                        "Google sync: +{} events, {} updated, {} conflicts.",
+                        events_added, events_updated, conflicts_detected
+                    )
+                } else {
                     format!(
                         "Google sync: +{} events, {} updated.",
                         events_added, events_updated
-                    ),
-                    false,
-                );
+                    )
+                };
+                self.set_status(status, false);
                 self.worker.load_events(self.view_year, self.view_month);
+                self.worker.load_calendar_sync_states();
             }
             WorkerResult::StatusMessage(msg) => {
                 self.set_status(msg, false);

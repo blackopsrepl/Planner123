@@ -21,6 +21,7 @@ pub enum WorkerResult {
     GoogleSyncComplete {
         events_added: usize,
         events_updated: usize,
+        conflicts_detected: usize,
     },
     Error(String),
     StatusMessage(String),
@@ -249,13 +250,21 @@ impl Worker {
                 .filter(|c| c.source == crate::models::CalendarSource::Google)
             {
                 match crate::google::sync::sync_calendar(google_client.as_ref(), cal).await {
-                    Ok((added, updated)) => {
+                    Ok(report) => {
                         let _ = tx.send(WorkerResult::GoogleSyncComplete {
-                            events_added: added,
-                            events_updated: updated,
+                            events_added: report.events_added,
+                            events_updated: report.events_updated + report.pushed_updates,
+                            conflicts_detected: report.conflicts_detected,
                         });
                     }
                     Err(e) => {
+                        if let Ok(conn) = crate::db::open() {
+                            let _ = crate::sync::engine::mark_calendar_sync_error(
+                                &conn,
+                                cal,
+                                &e.to_string(),
+                            );
+                        }
                         let _ = tx.send(WorkerResult::Error(format!(
                             "Google sync failed for '{}': {}",
                             cal.name, e
