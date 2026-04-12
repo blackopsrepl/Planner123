@@ -104,6 +104,7 @@ fn field_value(app: &App, field: &FormField, cursor: &str) -> String {
         FormField::Date => format!("{}{}", app.form_date, cursor),
         FormField::StartTime => format!("{}{}", app.form_start_time, cursor),
         FormField::EndTime => format!("{}{}", app.form_end_time, cursor),
+        FormField::Timezone => format!("{}{}", app.form_timezone, cursor),
         FormField::Location => {
             if app.form_location.is_empty() && cursor.is_empty() {
                 "(optional)".to_string()
@@ -136,7 +137,13 @@ fn field_value(app: &App, field: &FormField, cursor: &str) -> String {
         FormField::Calendar => app
             .calendars
             .get(app.form_calendar_index)
-            .map(|c| format!("{} ● (h/l)", c.name))
+            .map(|c| {
+                let source = match c.source {
+                    crate::models::CalendarSource::Local => "local",
+                    crate::models::CalendarSource::Google => "google",
+                };
+                format!("{} [{}] (h/l)", c.name, source)
+            })
             .unwrap_or_else(|| "no calendars".to_string()),
         FormField::Project => {
             if app.form_project_index == 0 {

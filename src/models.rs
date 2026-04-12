@@ -1,4 +1,5 @@
 use chrono::{DateTime, NaiveDate, Utc};
+use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -105,16 +106,24 @@ impl Event {
 
     /// Parse `start_at` into a `DateTime<Utc>` for calendar math.
     pub fn start_dt(&self) -> Option<DateTime<Utc>> {
-        chrono::NaiveDateTime::parse_from_str(&self.start_at, "%Y-%m-%d %H:%M:%S")
-            .ok()
-            .map(|ndt| DateTime::from_naive_utc_and_offset(ndt, Utc))
+        self.start_local_dt().map(|dt| dt.with_timezone(&Utc))
     }
 
     /// Parse `end_at` into a `DateTime<Utc>`.
     pub fn end_dt(&self) -> Option<DateTime<Utc>> {
-        chrono::NaiveDateTime::parse_from_str(&self.end_at, "%Y-%m-%d %H:%M:%S")
-            .ok()
-            .map(|ndt| DateTime::from_naive_utc_and_offset(ndt, Utc))
+        self.end_local_dt().map(|dt| dt.with_timezone(&Utc))
+    }
+
+    pub fn timezone_tz(&self) -> Option<Tz> {
+        crate::time::parse_timezone(&self.timezone).ok()
+    }
+
+    pub fn start_local_dt(&self) -> Option<DateTime<Tz>> {
+        crate::time::resolve_local_datetime(&self.start_at, &self.timezone).ok()
+    }
+
+    pub fn end_local_dt(&self) -> Option<DateTime<Tz>> {
+        crate::time::resolve_local_datetime(&self.end_at, &self.timezone).ok()
     }
 
     /// Duration in minutes.
@@ -124,9 +133,9 @@ impl Event {
         Some((end - start).num_minutes())
     }
 
-    /// True if this event occurs on the given date (UTC).
+    /// True if this event occurs on the given wall-clock date.
     pub fn occurs_on(&self, date: NaiveDate) -> bool {
-        if let (Some(start), Some(end)) = (self.start_dt(), self.end_dt()) {
+        if let (Some(start), Some(end)) = (self.start_local_dt(), self.end_local_dt()) {
             let s = start.date_naive();
             let e = end.date_naive();
             date >= s && date <= e

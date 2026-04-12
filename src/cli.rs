@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     calendar_service::{self, CreateCalendarInput, UpdateCalendarInput},
     dag::EventDag,
-    db, google, models,
+    db, event_service, google, models,
 };
 
 #[derive(Debug, Parser)]
@@ -194,8 +194,8 @@ pub struct EventCreateArgs {
     rrule: Option<String>,
     #[arg(long)]
     reminder_minutes: Option<i64>,
-    #[arg(long, default_value = "UTC")]
-    timezone: String,
+    #[arg(long)]
+    timezone: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -581,12 +581,17 @@ fn handle_events(conn: &Connection, action: EventCommand) -> Result<Value, CliEr
                 google_id: None,
                 google_etag: None,
                 reminder_minutes: args.reminder_minutes,
-                timezone: non_empty(args.timezone, "timezone")?,
+                timezone: args
+                    .timezone
+                    .map(|timezone| non_empty(timezone, "timezone"))
+                    .transpose()?
+                    .unwrap_or_else(crate::time::local_timezone_name),
                 created_at: now.clone(),
                 updated_at: now,
                 deleted_at: None,
             };
-            db::insert_event(conn, &event).map_err(internal_error)?;
+            let event =
+                event_service::save_event(conn, event, true).map_err(event_service_error)?;
             Ok(json!(event))
         }
         EventCommand::Update(args) => {
@@ -645,20 +650,12 @@ fn handle_events(conn: &Connection, action: EventCommand) -> Result<Value, CliEr
             }
 
             validate_event_datetime(&event.start_at, &event.end_at)?;
-            db::update_event(conn, &event).map_err(internal_error)?;
-            Ok(json!(require_resource(
-                db::get_event(conn, &args.id).map_err(internal_error)?,
-                "event",
-                &args.id,
-            )?))
+            let event =
+                event_service::save_event(conn, event, false).map_err(event_service_error)?;
+            Ok(json!(event))
         }
         EventCommand::Delete { id } => {
-            require_resource(
-                db::get_event(conn, &id).map_err(internal_error)?,
-                "event",
-                &id,
-            )?;
-            db::soft_delete_event(conn, &id).map_err(internal_error)?;
+            event_service::delete_event(conn, &id).map_err(event_service_error)?;
             Ok(json!(DeleteData {
                 resource: "event",
                 id,
@@ -903,6 +900,17 @@ fn calendar_service_error(err: calendar_service::CalendarServiceError) -> CliErr
         }
         calendar_service::CalendarServiceError::Conflict(message) => CliError::conflict(message),
         calendar_service::CalendarServiceError::Internal(message) => CliError::internal(message),
+    }
+}
+
+fn event_service_error(err: event_service::EventServiceError) -> CliError {
+    match err {
+        event_service::EventServiceError::NotFound { resource, id } => {
+            CliError::not_found(resource, &id)
+        }
+        event_service::EventServiceError::Validation(message) => CliError::validation(message),
+        event_service::EventServiceError::Conflict(message) => CliError::conflict(message),
+        event_service::EventServiceError::Internal(message) => CliError::internal(message),
     }
 }
 

@@ -142,12 +142,7 @@ impl Worker {
         self.rt.spawn_blocking(move || {
             let result = (|| -> Result<_> {
                 let conn = crate::db::open()?;
-                if is_new {
-                    crate::db::insert_event(&conn, &event)?;
-                } else {
-                    crate::db::update_event(&conn, &event)?;
-                }
-                Ok(event)
+                crate::event_service::save_event(&conn, event, is_new).map_err(Into::into)
             })();
             match result {
                 Ok(ev) => {
@@ -165,7 +160,7 @@ impl Worker {
         self.rt.spawn_blocking(move || {
             let result = (|| -> Result<_> {
                 let conn = crate::db::open()?;
-                crate::db::soft_delete_event(&conn, &event_id)?;
+                crate::event_service::delete_event(&conn, &event_id)?;
                 Ok(event_id)
             })();
             match result {

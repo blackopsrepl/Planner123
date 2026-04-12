@@ -17,6 +17,7 @@ pub enum FormField {
     StartTime,
     EndTime,
     Calendar,
+    Timezone,
     Location,
     Description,
     Recurrence,
@@ -34,6 +35,7 @@ impl FormField {
             Self::EndTime,
             Self::AllDay,
             Self::Calendar,
+            Self::Timezone,
             Self::Location,
             Self::Description,
             Self::Recurrence,
@@ -49,6 +51,7 @@ impl FormField {
             Self::StartTime => "Start",
             Self::EndTime => "End",
             Self::Calendar => "Calendar",
+            Self::Timezone => "Timezone",
             Self::Location => "Location",
             Self::Description => "Description",
             Self::Recurrence => "Repeats",
@@ -99,6 +102,7 @@ pub struct App {
     pub form_rrule: String,
     pub form_reminder: String,
     pub form_calendar_index: usize,
+    pub form_timezone: String,
     pub form_project_index: usize, // 0 = none
     pub form_all_day: bool,
     pub form_recurrence_index: usize,
@@ -165,6 +169,7 @@ impl App {
             form_rrule: String::new(),
             form_reminder: String::new(),
             form_calendar_index: 0,
+            form_timezone: crate::time::local_timezone_name(),
             form_project_index: 0,
             form_all_day: false,
             form_recurrence_index: 0,
@@ -503,6 +508,7 @@ impl App {
                 self.form_reminder = "15".to_string();
                 self.form_all_day = false;
                 self.form_calendar_index = 0;
+                self.form_timezone = crate::time::local_timezone_name();
                 self.form_project_index = 0;
                 self.form_recurrence_index = 0;
             }
@@ -534,6 +540,7 @@ impl App {
                     .iter()
                     .position(|c| c.id == ev.calendar_id)
                     .unwrap_or(0);
+                self.form_timezone = ev.timezone.clone();
                 self.form_project_index = ev
                     .project_id
                     .as_ref()
@@ -606,6 +613,7 @@ impl App {
             Some(FormField::EndTime) => self.form_end_time.push(c),
             Some(FormField::Location) => self.form_location.push(c),
             Some(FormField::Description) => self.form_description.push(c),
+            Some(FormField::Timezone) => self.form_timezone.push(c),
             Some(FormField::Recurrence) => self.form_rrule.push(c),
             Some(FormField::Reminder) => {
                 if c.is_ascii_digit() {
@@ -660,6 +668,9 @@ impl App {
             Some(FormField::Description) => {
                 self.form_description.pop();
             }
+            Some(FormField::Timezone) => {
+                self.form_timezone.pop();
+            }
             Some(FormField::Recurrence) => {
                 self.form_rrule.pop();
             }
@@ -688,7 +699,7 @@ impl App {
 
         let start_at = format!("{} {}:00", self.form_date, self.form_start_time);
         let end_at = format!("{} {}:00", self.form_date, self.form_end_time);
-        let timezone = "UTC".to_string(); // TODO: use local timezone
+        let timezone = self.form_timezone.trim().to_string();
 
         let mut event = if let Some(existing) = &self.form_editing_event {
             existing.clone()
@@ -701,6 +712,7 @@ impl App {
         event.start_at = start_at;
         event.end_at = end_at;
         event.all_day = self.form_all_day;
+        event.timezone = timezone;
         event.location = if self.form_location.is_empty() {
             None
         } else {
@@ -767,6 +779,8 @@ impl App {
         }
 
         let event = Event::new(cal_id, title, start, end, "UTC");
+        let mut event = event;
+        event.timezone = crate::time::local_timezone_name();
         self.loading = true;
         self.worker.save_event(event, true);
     }

@@ -2749,6 +2749,7 @@ dependencies = [
  "crossterm",
  "dirs",
  "google-calendar3",
+ "iana-time-zone",
  "icalendar",
  "keyring",
  "notify-rust",

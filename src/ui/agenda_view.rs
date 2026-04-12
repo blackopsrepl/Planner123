@@ -37,7 +37,7 @@ pub fn render_agenda(app: &App, frame: &mut Frame, area: Rect) {
     let mut event_count = 0;
 
     for ev in &visible_events {
-        let date = if let Some(dt) = ev.start_dt() {
+        let date = if let Some(dt) = ev.start_local_dt() {
             dt.date_naive()
         } else {
             continue;
@@ -76,11 +76,11 @@ pub fn render_agenda(app: &App, frame: &mut Frame, area: Rect) {
             "all day ".to_string()
         } else {
             let start = ev
-                .start_dt()
+                .start_local_dt()
                 .map(|d| d.format("%H:%M").to_string())
                 .unwrap_or_default();
             let end = ev
-                .end_dt()
+                .end_local_dt()
                 .map(|d| d.format("%H:%M").to_string())
                 .unwrap_or_default();
             format!("{}-{}", start, end)

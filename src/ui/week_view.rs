@@ -180,7 +180,7 @@ pub fn render_time_grid(
                     if !e.occurs_on(date) {
                         return false;
                     }
-                    if let Some(start) = e.start_dt() {
+                    if let Some(start) = e.start_local_dt() {
                         start.hour() == hour
                     } else {
                         false
@@ -192,7 +192,7 @@ pub fn render_time_grid(
             let event_heights: Vec<u16> = hour_events
                 .iter()
                 .map(|e| {
-                    if let (Some(start), Some(end)) = (e.start_dt(), e.end_dt()) {
+                    if let (Some(start), Some(end)) = (e.start_local_dt(), e.end_local_dt()) {
                         let duration_mins = (end - start).num_minutes().max(0) as u32;
                         let duration_hours = duration_mins.div_ceil(60).max(1);
                         let max_rows = area.y + area.height - y;
@@ -272,7 +272,7 @@ fn render_hour_cell(
             Span::styled(title, title_style),
         ]));
         if ev_height >= 2 {
-            let time_str = if let Some(start) = ev.start_dt() {
+            let time_str = if let Some(start) = ev.start_local_dt() {
                 format!("{:02}:{:02}", start.hour(), start.minute())
             } else {
                 String::new()

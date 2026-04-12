@@ -25,6 +25,7 @@ anyhow = "1"
 # Time — chrono for calendar math, chrono-tz for IANA timezone support
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }
+iana-time-zone = "0.1"
 
 # RFC 5545 recurrence rule parsing + expansion
 rrule = { version = "0.14", features = ["serde"] }
