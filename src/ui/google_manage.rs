@@ -35,6 +35,16 @@ pub fn render_google_manage(app: &App, frame: &mut Frame) {
         .iter()
         .filter(|calendar| calendar.source == crate::models::CalendarSource::Google)
         .count();
+    let pending_outbox: usize = app
+        .calendar_sync_state
+        .values()
+        .map(|state| state.pending_outbox)
+        .sum();
+    let pending_conflicts: usize = app
+        .calendar_sync_state
+        .values()
+        .map(|state| state.pending_conflicts)
+        .sum();
 
     let mut lines = vec![
         Line::from(""),
@@ -46,6 +56,12 @@ pub fn render_google_manage(app: &App, frame: &mut Frame) {
             Span::styled("  Imported calendars: ", t.form_label()),
             Span::styled(imported_count.to_string(), t.normal()),
         ]),
+        Line::from(vec![
+            Span::styled("  Pending outbound: ", t.form_label()),
+            Span::styled(pending_outbox.to_string(), t.normal()),
+            Span::styled("    Conflicts: ", t.form_label()),
+            Span::styled(pending_conflicts.to_string(), t.normal()),
+        ]),
         Line::from(""),
         Line::from(vec![Span::styled(
             "  r refresh   i import   l login/reconnect   o logout   s sync",
@@ -53,6 +69,66 @@ pub fn render_google_manage(app: &App, frame: &mut Frame) {
         )]),
         Line::from(""),
     ];
+
+    let imported_google: Vec<_> = app
+        .calendars
+        .iter()
+        .filter(|calendar| calendar.source == crate::models::CalendarSource::Google)
+        .collect();
+
+    if imported_google.is_empty() {
+        lines.push(Line::from(vec![Span::styled(
+            "  No Google calendars imported yet.",
+            t.dimmed(),
+        )]));
+    } else {
+        lines.push(Line::from(vec![Span::styled(
+            "  Imported calendars",
+            t.accent_style(),
+        )]));
+        lines.push(Line::from(""));
+
+        for calendar in imported_google {
+            let state = app.calendar_sync_state.get(&calendar.id);
+            let mut badges = Vec::new();
+            if state.map(|state| state.writable).unwrap_or(true) {
+                badges.push("writable".to_string());
+            } else {
+                badges.push("read-only".to_string());
+            }
+            if let Some(access_role) = state.and_then(|state| state.google_access_role.as_deref()) {
+                badges.push(access_role.to_string());
+            }
+            if let Some(state) = state {
+                if state.pending_outbox > 0 {
+                    badges.push(format!("pending {}", state.pending_outbox));
+                }
+                if state.pending_conflicts > 0 {
+                    badges.push(format!("conflicts {}", state.pending_conflicts));
+                }
+                if let Some(last_synced_at) = state.last_synced_at.as_deref() {
+                    badges.push(format!("synced {}", last_synced_at));
+                }
+                if state.last_sync_error_message.is_some() {
+                    badges.push("error".to_string());
+                }
+            }
+            lines.push(Line::from(vec![
+                Span::styled("  ", t.normal()),
+                Span::styled(
+                    format!("{} [{}]", calendar.name, badges.join(", ")),
+                    t.normal(),
+                ),
+            ]));
+            if let Some(error) = state.and_then(|state| state.last_sync_error_message.as_deref()) {
+                lines.push(Line::from(vec![
+                    Span::styled("    ", t.normal()),
+                    Span::styled(error.to_string(), t.error()),
+                ]));
+            }
+        }
+        lines.push(Line::from(""));
+    }
 
     if app.google_discovered_calendars.is_empty() {
         lines.push(Line::from(vec![Span::styled(

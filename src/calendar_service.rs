@@ -178,6 +178,8 @@ pub fn import_google_calendar(
             last_synced_at: None,
             last_sync_error_code: None,
             last_sync_error_message: None,
+            pending_outbox: 0,
+            pending_conflicts: 0,
             created_at: String::new(),
             updated_at: String::new(),
         },

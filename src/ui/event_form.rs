@@ -83,6 +83,13 @@ pub fn render_event_form(app: &App, frame: &mut Frame) {
     }
 
     lines.push(Line::from(""));
+    if let Some(note) = sync_note(app) {
+        lines.push(Line::from(vec![
+            Span::styled("  ", t.normal()),
+            Span::styled(note, t.dimmed()),
+        ]));
+        lines.push(Line::from(""));
+    }
     // Footer hints
     lines.push(Line::from(vec![
         Span::styled("  ", t.normal()),
@@ -96,6 +103,28 @@ pub fn render_event_form(app: &App, frame: &mut Frame) {
 
     let para = Paragraph::new(lines);
     frame.render_widget(para, inner);
+}
+
+fn sync_note(app: &App) -> Option<String> {
+    let calendar = app.calendars.get(app.form_calendar_index)?;
+    Some(match calendar.source {
+        crate::models::CalendarSource::Local => {
+            "Local calendar only. Changes stay on this device.".to_string()
+        }
+        crate::models::CalendarSource::Google => {
+            let state = app.calendar_sync_state.get(&calendar.id);
+            if state.map(|state| !state.writable).unwrap_or(false) {
+                "Read-only Google calendar. Saving local edits is blocked.".to_string()
+            } else if state
+                .map(|state| state.pending_conflicts > 0)
+                .unwrap_or(false)
+            {
+                "Writable Google calendar. Conflicts are pending on this calendar.".to_string()
+            } else {
+                "Writable Google calendar. Changes sync on the next S run.".to_string()
+            }
+        }
+    })
 }
 
 fn field_value(app: &App, field: &FormField, cursor: &str) -> String {

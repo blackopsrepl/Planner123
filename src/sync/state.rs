@@ -121,6 +121,8 @@ pub struct CalendarSyncState {
     pub last_synced_at: Option<String>,
     pub last_sync_error_code: Option<String>,
     pub last_sync_error_message: Option<String>,
+    pub pending_outbox: usize,
+    pub pending_conflicts: usize,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -172,10 +174,16 @@ pub fn load_calendar_sync_state(
     calendar_id: &str,
 ) -> Result<Option<CalendarSyncState>> {
     conn.query_row(
-        "SELECT calendar_id, google_access_role, writable, last_synced_at,
-                last_sync_error_code, last_sync_error_message, created_at, updated_at
-         FROM calendar_sync_state
-         WHERE calendar_id = ?1",
+        "SELECT css.calendar_id, css.google_access_role, css.writable, css.last_synced_at,
+                css.last_sync_error_code, css.last_sync_error_message,
+                (SELECT COUNT(*) FROM sync_outbox
+                 WHERE provider = 'google' AND calendar_id = css.calendar_id),
+                (SELECT COUNT(*) FROM sync_conflicts
+                 WHERE calendar_id = css.calendar_id
+                   AND resolution_status = 'pending'),
+                css.created_at, css.updated_at
+         FROM calendar_sync_state css
+         WHERE css.calendar_id = ?1",
         [calendar_id],
         |row| {
             Ok(CalendarSyncState {
@@ -185,8 +193,10 @@ pub fn load_calendar_sync_state(
                 last_synced_at: row.get(3)?,
                 last_sync_error_code: row.get(4)?,
                 last_sync_error_message: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                pending_outbox: row.get::<_, i64>(6)? as usize,
+                pending_conflicts: row.get::<_, i64>(7)? as usize,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
             })
         },
     )
@@ -196,10 +206,16 @@ pub fn load_calendar_sync_state(
 
 pub fn load_calendar_sync_states(conn: &Connection) -> Result<Vec<CalendarSyncState>> {
     let mut stmt = conn.prepare(
-        "SELECT calendar_id, google_access_role, writable, last_synced_at,
-                last_sync_error_code, last_sync_error_message, created_at, updated_at
-         FROM calendar_sync_state
-         ORDER BY calendar_id",
+        "SELECT css.calendar_id, css.google_access_role, css.writable, css.last_synced_at,
+                css.last_sync_error_code, css.last_sync_error_message,
+                (SELECT COUNT(*) FROM sync_outbox
+                 WHERE provider = 'google' AND calendar_id = css.calendar_id),
+                (SELECT COUNT(*) FROM sync_conflicts
+                 WHERE calendar_id = css.calendar_id
+                   AND resolution_status = 'pending'),
+                css.created_at, css.updated_at
+         FROM calendar_sync_state css
+         ORDER BY css.calendar_id",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(CalendarSyncState {
@@ -209,8 +225,10 @@ pub fn load_calendar_sync_states(conn: &Connection) -> Result<Vec<CalendarSyncSt
             last_synced_at: row.get(3)?,
             last_sync_error_code: row.get(4)?,
             last_sync_error_message: row.get(5)?,
-            created_at: row.get(6)?,
-            updated_at: row.get(7)?,
+            pending_outbox: row.get::<_, i64>(6)? as usize,
+            pending_conflicts: row.get::<_, i64>(7)? as usize,
+            created_at: row.get(8)?,
+            updated_at: row.get(9)?,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -697,8 +715,9 @@ mod tests {
     use tempfile::TempDir;
 
     use super::{
-        get_outbox_entry, load_event_sync_state, upsert_calendar_sync_state, CalendarSyncState,
-        OutboxOperation, SyncState, GOOGLE_PROVIDER,
+        get_outbox_entry, insert_conflict, load_calendar_sync_state, load_event_sync_state,
+        upsert_calendar_sync_state, CalendarSyncState, ConflictResolutionStatus, OutboxOperation,
+        SyncConflict, SyncState, GOOGLE_PROVIDER,
     };
     use crate::{
         db,
@@ -773,6 +792,8 @@ mod tests {
                 last_synced_at: None,
                 last_sync_error_code: None,
                 last_sync_error_message: None,
+                pending_outbox: 0,
+                pending_conflicts: 0,
                 created_at: String::new(),
                 updated_at: String::new(),
             },
@@ -828,5 +849,72 @@ mod tests {
             .unwrap()
             .is_none());
         assert!(load_event_sync_state(&conn, &event.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn calendar_sync_state_reports_pending_counts() {
+        let (_temp, conn) = open_test_db();
+        let calendar = crate::calendar_service::create_calendar(
+            &conn,
+            crate::calendar_service::CreateCalendarInput {
+                name: "Google".to_string(),
+                color: "#50f872".to_string(),
+                source: CalendarSource::Google,
+                google_id: Some("primary@example.com".to_string()),
+                visible: true,
+                position: None,
+            },
+        )
+        .unwrap();
+        upsert_calendar_sync_state(
+            &conn,
+            &CalendarSyncState {
+                calendar_id: calendar.id.clone(),
+                google_access_role: Some("owner".to_string()),
+                writable: true,
+                last_synced_at: None,
+                last_sync_error_code: None,
+                last_sync_error_message: None,
+                pending_outbox: 0,
+                pending_conflicts: 0,
+                created_at: String::new(),
+                updated_at: String::new(),
+            },
+        )
+        .unwrap();
+        let event = crate::event_service::save_event(
+            &conn,
+            Event::new(
+                calendar.id.clone(),
+                "Planning",
+                "2026-04-12 09:00:00",
+                "2026-04-12 10:00:00",
+                "UTC",
+            ),
+            true,
+        )
+        .unwrap();
+        insert_conflict(
+            &conn,
+            &SyncConflict {
+                id: String::new(),
+                event_id: event.id,
+                calendar_id: calendar.id.clone(),
+                local_snapshot: "{}".to_string(),
+                remote_snapshot: "{}".to_string(),
+                remote_etag: Some("\"etag\"".to_string()),
+                detected_at: String::new(),
+                resolution_status: ConflictResolutionStatus::Pending,
+                resolution_strategy: None,
+                resolved_at: None,
+            },
+        )
+        .unwrap();
+
+        let state = load_calendar_sync_state(&conn, &calendar.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(state.pending_outbox, 1);
+        assert_eq!(state.pending_conflicts, 1);
     }
 }

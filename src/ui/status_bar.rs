@@ -40,6 +40,7 @@ pub fn render_header(app: &App, frame: &mut Frame, area: Rect) {
         View::Day => app.focused_date.format("%A, %B %-d, %Y").to_string(),
         View::Agenda => "Agenda".to_string(),
         View::EventForm => "New Event".to_string(),
+        View::IcalImport => "Import .ics".to_string(),
         _ => "SolverForge Calendar".to_string(),
     };
 
@@ -86,12 +87,51 @@ pub fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
     } else {
         // Show today's time
         let now = Local::now().format("%H:%M").to_string();
-        let google_state = match crate::google::auth::auth_status().state {
-            crate::google::auth::GoogleAuthState::Connected => "google connected",
-            crate::google::auth::GoogleAuthState::NeedsReauth => "google reauth",
-            crate::google::auth::GoogleAuthState::Disconnected => "google off",
+        let google_calendars = app
+            .calendars
+            .iter()
+            .filter(|calendar| calendar.source == crate::models::CalendarSource::Google)
+            .count();
+        let failed = app
+            .calendar_sync_state
+            .values()
+            .filter(|state| state.last_sync_error_message.is_some())
+            .count();
+        let pending_outbox: usize = app
+            .calendar_sync_state
+            .values()
+            .map(|state| state.pending_outbox)
+            .sum();
+        let pending_conflicts: usize = app
+            .calendar_sync_state
+            .values()
+            .map(|state| state.pending_conflicts)
+            .sum();
+        let (google_state, style) = match crate::google::auth::auth_status().state {
+            crate::google::auth::GoogleAuthState::Disconnected => {
+                ("google off".to_string(), t.dimmed())
+            }
+            crate::google::auth::GoogleAuthState::NeedsReauth => {
+                ("google reauth".to_string(), t.error())
+            }
+            crate::google::auth::GoogleAuthState::Connected if failed > 0 => {
+                (format!("google failed:{}", failed), t.error())
+            }
+            crate::google::auth::GoogleAuthState::Connected if pending_conflicts > 0 => {
+                (format!("google conflicts:{}", pending_conflicts), t.error())
+            }
+            crate::google::auth::GoogleAuthState::Connected if pending_outbox > 0 => (
+                format!("google pending:{}", pending_outbox),
+                t.accent_style(),
+            ),
+            crate::google::auth::GoogleAuthState::Connected if google_calendars > 0 => {
+                ("google synced".to_string(), t.accent_style())
+            }
+            crate::google::auth::GoogleAuthState::Connected => {
+                ("google connected".to_string(), t.dimmed())
+            }
         };
-        Span::styled(format!(" {}  {} ", google_state, now), t.dimmed())
+        Span::styled(format!(" {}  {} ", google_state, now), style)
     };
 
     // Left-align hints, right-align status (simplified: just concat)
