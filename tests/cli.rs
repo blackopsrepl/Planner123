@@ -453,6 +453,49 @@ fn events_support_range_lists_and_clear_conflicts() {
 }
 
 #[test]
+fn ical_import_creates_events_and_reports_skipped_shapes() {
+    let temp = TempDir::new().unwrap();
+    let calendar_id = first_calendar_id(&temp);
+    let ics_path = temp.path().join("import.ics");
+    std::fs::write(
+        &ics_path,
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nSUMMARY:Planning\r\nDESCRIPTION:Discuss\\nPlan\r\nLOCATION:HQ\r\nDTSTART;TZID=Europe/Rome:20260412T090000\r\nDTEND;TZID=Europe/Rome:20260412T100000\r\nRRULE:FREQ=WEEKLY;COUNT=2\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nSUMMARY:Holiday\r\nDTSTART;VALUE=DATE:20260420\r\nDTEND;VALUE=DATE:20260422\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nSUMMARY:Exception\r\nRECURRENCE-ID:20260412T090000Z\r\nDTSTART:20260412T090000Z\r\nDTEND:20260412T100000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    )
+    .unwrap();
+
+    let imported = cli_command(&temp)
+        .args([
+            "ical",
+            "import",
+            "--calendar-id",
+            &calendar_id,
+            "--path",
+            ics_path.to_str().unwrap(),
+            "--timezone",
+            "Europe/Rome",
+        ])
+        .output()
+        .unwrap();
+    assert!(imported.status.success());
+    let imported_json = read_json(&imported.stdout);
+    assert_eq!(imported_json["data"]["imported"], 2);
+    assert_eq!(imported_json["data"]["skipped"], 1);
+    assert!(imported_json["data"]["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|warning| warning.as_str().unwrap().contains("RECURRENCE-ID")));
+
+    let listed = cli_command(&temp)
+        .args(["events", "list"])
+        .output()
+        .unwrap();
+    assert!(listed.status.success());
+    let listed_json = read_json(&listed.stdout);
+    assert_eq!(listed_json["data"].as_array().unwrap().len(), 2);
+}
+
+#[test]
 fn dependency_crud_and_validation_work() {
     let temp = TempDir::new().unwrap();
     let calendar_id = first_calendar_id(&temp);

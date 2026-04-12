@@ -9,6 +9,7 @@ pub enum View {
     Agenda,
     CalendarList, // sidebar focused
     EventForm,
+    IcalImport,
     QuickAdd,
     Help,
     GoogleManage,
@@ -108,6 +109,7 @@ pub fn resolve(view: &View, key: KeyEvent) -> Action {
         View::Agenda => resolve_agenda(key),
         View::CalendarList => resolve_calendar_list(key),
         View::EventForm => resolve_event_form(key),
+        View::IcalImport => resolve_ical_import(key),
         View::QuickAdd => resolve_input(key),
         View::Help => resolve_help(key),
         View::GoogleManage => resolve_google_manage(key),
@@ -241,6 +243,19 @@ fn resolve_input(key: KeyEvent) -> Action {
     }
 }
 
+fn resolve_ical_import(key: KeyEvent) -> Action {
+    use KeyCode::*;
+    match key.code {
+        Esc => Action::FormCancel,
+        Enter => Action::FormSubmit,
+        Tab | Down => Action::FormNextField,
+        BackTab | Up => Action::FormPrevField,
+        Char(c) => Action::InputChar(c),
+        Backspace => Action::InputBackspace,
+        _ => Action::None,
+    }
+}
+
 fn resolve_help(key: KeyEvent) -> Action {
     use KeyCode::*;
     match key.code {
@@ -328,6 +343,7 @@ pub fn hints(view: &View) -> Vec<Hint> {
             ("?", "help"),
         ],
         View::EventForm => vec![("Tab/↑↓", "field"), ("Enter", "save"), ("Esc", "cancel")],
+        View::IcalImport => vec![("Tab/↑↓", "field"), ("Enter", "import"), ("Esc", "cancel")],
         View::QuickAdd => vec![("Enter", "add"), ("Esc", "cancel")],
         View::Help => vec![("j/k", "scroll"), ("Esc", "close")],
         View::GoogleManage => vec![

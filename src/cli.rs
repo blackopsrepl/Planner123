@@ -41,6 +41,10 @@ pub enum Command {
         #[command(subcommand)]
         action: GoogleCommand,
     },
+    Ical {
+        #[command(subcommand)]
+        action: IcalCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -95,6 +99,11 @@ pub enum GoogleCommand {
         #[command(subcommand)]
         action: GoogleConflictCommand,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum IcalCommand {
+    Import(IcalImportArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -329,6 +338,16 @@ pub struct GoogleConflictResolveArgs {
     strategy: ConflictStrategyArg,
 }
 
+#[derive(Debug, Args)]
+pub struct IcalImportArgs {
+    #[arg(long)]
+    calendar_id: String,
+    #[arg(long)]
+    path: String,
+    #[arg(long)]
+    timezone: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct CliError {
     pub code: &'static str,
@@ -453,6 +472,7 @@ fn execute_with_backend(
         Command::Google { action } => {
             handle_google_with_backend(conn, action, google_sync_backend)?
         }
+        Command::Ical { action } => handle_ical(conn, action)?,
     };
     Ok(success_value(data))
 }
@@ -1016,6 +1036,27 @@ fn handle_google_conflicts(
                     }
                 })?;
             Ok(json!(resolved))
+        }
+    }
+}
+
+fn handle_ical(conn: &Connection, action: IcalCommand) -> Result<Value, CliError> {
+    match action {
+        IcalCommand::Import(args) => {
+            ensure_calendar_exists(conn, &args.calendar_id)?;
+            let timezone = args
+                .timezone
+                .map(|value| non_empty(value, "timezone"))
+                .transpose()?
+                .unwrap_or_else(crate::time::local_timezone_name);
+            let report = crate::ical::import_from_file(
+                conn,
+                &args.calendar_id,
+                std::path::Path::new(&args.path),
+                &timezone,
+            )
+            .map_err(internal_error)?;
+            Ok(json!(report))
         }
     }
 }

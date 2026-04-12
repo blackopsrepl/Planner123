@@ -17,6 +17,7 @@ pub mod event_form;
 pub mod google_auth;
 pub mod google_manage;
 pub mod help;
+pub mod ical_import;
 pub mod month_view;
 pub mod quick_add;
 pub mod status_bar;
@@ -70,6 +71,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             // Show month view behind the form
             month_view::render_month(app, frame, content_area);
         }
+        View::IcalImport => {
+            month_view::render_month(app, frame, content_area);
+        }
         View::QuickAdd => {
             month_view::render_month(app, frame, content_area);
         }
@@ -96,6 +100,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         View::Help => help::render_help(app, frame),
         View::GoogleManage => google_manage::render_google_manage(app, frame),
         View::GoogleAuth => google_auth::render_google_auth(app, frame),
+        View::IcalImport => ical_import::render_ical_import(app, frame),
         _ => {}
     }
 }

@@ -110,6 +110,11 @@ pub struct App {
     pub form_all_day: bool,
     pub form_recurrence_index: usize,
 
+    // ── iCal import state ─────────────────────────────────────────
+    pub ical_import_path: String,
+    pub ical_import_calendar_index: usize,
+    pub ical_import_field_index: usize,
+
     // ── Quick-add bar ─────────────────────────────────────────────
     pub quick_add_input: String,
 
@@ -179,6 +184,9 @@ impl App {
             form_project_index: 0,
             form_all_day: false,
             form_recurrence_index: 0,
+            ical_import_path: String::new(),
+            ical_import_calendar_index: 0,
+            ical_import_field_index: 0,
             quick_add_input: String::new(),
             agenda_scroll: 0,
             help_scroll: 0,
@@ -260,9 +268,29 @@ impl App {
             Action::SelectEvent => self.select_event(),
 
             // Form
-            Action::FormNextField => self.form_next_field(),
-            Action::FormPrevField => self.form_prev_field(),
-            Action::FormSubmit => self.form_submit(),
+            Action::FormNextField => match self.view {
+                View::GoogleAuth => {
+                    if self.google_auth_field < 1 {
+                        self.google_auth_field += 1;
+                    }
+                }
+                View::IcalImport => self.ical_import_next_field(),
+                _ => self.form_next_field(),
+            },
+            Action::FormPrevField => match self.view {
+                View::GoogleAuth => {
+                    if self.google_auth_field > 0 {
+                        self.google_auth_field -= 1;
+                    }
+                }
+                View::IcalImport => self.ical_import_prev_field(),
+                _ => self.form_prev_field(),
+            },
+            Action::FormSubmit => match self.view {
+                View::GoogleAuth => self.handle_input_submit(),
+                View::IcalImport => self.ical_import_submit(),
+                _ => self.form_submit(),
+            },
             Action::FormCancel => self.handle_escape(),
             Action::InputChar(c) => self.form_input_char(c),
             Action::InputBackspace => self.form_input_backspace(),
@@ -311,9 +339,7 @@ impl App {
             Action::GoogleAuthLogout => self.google_logout(),
 
             // iCal
-            Action::ImportIcal => {
-                self.set_status("iCal import: use `import <path>` in quick-add.", false)
-            }
+            Action::ImportIcal => self.open_ical_import(),
             Action::ExportIcal => self.export_ical(),
 
             Action::None | Action::JumpToDate => {}
@@ -408,6 +434,24 @@ impl App {
                 self.set_status(status, false);
                 self.worker.load_events(self.view_year, self.view_month);
                 self.worker.load_calendar_sync_states();
+            }
+            WorkerResult::IcalImported(report) => {
+                self.worker.load_events(self.view_year, self.view_month);
+                self.worker.load_calendar_sync_states();
+                self.view = View::Month;
+                let warning_suffix = if report.warnings.is_empty() {
+                    String::new()
+                } else {
+                    format!(" {} warnings.", report.warnings.len())
+                };
+                self.set_status(
+                    format!(
+                        "Imported {} events from {}.{}",
+                        report.imported, report.path, warning_suffix
+                    ),
+                    false,
+                );
+                self.loading = false;
             }
             WorkerResult::StatusMessage(msg) => {
                 self.set_status(msg, false);
@@ -534,6 +578,7 @@ impl App {
         match self.view {
             View::Help
             | View::EventForm
+            | View::IcalImport
             | View::QuickAdd
             | View::GoogleAuth
             | View::GoogleManage => {
@@ -640,6 +685,7 @@ impl App {
                     self.google_auth_client_secret.push(c);
                 }
             }
+            View::IcalImport => self.ical_import_input_char(c),
             View::EventForm => self.form_active_field_push(c),
             _ => {}
         }
@@ -657,6 +703,7 @@ impl App {
                     self.google_auth_client_secret.pop();
                 }
             }
+            View::IcalImport => self.ical_import_input_backspace(),
             View::EventForm => self.form_active_field_pop(),
             _ => {}
         }
@@ -814,6 +861,7 @@ impl App {
                     self.complete_google_auth();
                 }
             }
+            View::IcalImport => self.ical_import_submit(),
             _ => {}
         }
     }
@@ -848,6 +896,74 @@ impl App {
         if let Some(cal) = self.calendars.get_mut(self.calendar_list_index) {
             cal.visible = !cal.visible;
         }
+    }
+
+    // ── iCal import ───────────────────────────────────────────────
+
+    fn open_ical_import(&mut self) {
+        if self.calendars.is_empty() {
+            self.set_status("No calendar available for import.", true);
+            return;
+        }
+        self.ical_import_path.clear();
+        self.ical_import_calendar_index = self.calendar_list_index.min(self.calendars.len() - 1);
+        self.ical_import_field_index = 0;
+        self.view = View::IcalImport;
+    }
+
+    fn ical_import_next_field(&mut self) {
+        if self.ical_import_field_index < 1 {
+            self.ical_import_field_index += 1;
+        }
+    }
+
+    fn ical_import_prev_field(&mut self) {
+        if self.ical_import_field_index > 0 {
+            self.ical_import_field_index -= 1;
+        }
+    }
+
+    fn ical_import_input_char(&mut self, c: char) {
+        match self.ical_import_field_index {
+            0 => self.ical_import_path.push(c),
+            1 => {
+                if (c == 'h' || c == '-') && self.ical_import_calendar_index > 0 {
+                    self.ical_import_calendar_index -= 1;
+                } else if (c == 'l' || c == '+')
+                    && self.ical_import_calendar_index + 1 < self.calendars.len()
+                {
+                    self.ical_import_calendar_index += 1;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn ical_import_input_backspace(&mut self) {
+        if self.ical_import_field_index == 0 {
+            self.ical_import_path.pop();
+        }
+    }
+
+    fn ical_import_submit(&mut self) {
+        let path = self.ical_import_path.trim().to_string();
+        if path.is_empty() {
+            self.set_status("Import path cannot be empty.", true);
+            return;
+        }
+        let Some(calendar_id) = self
+            .calendars
+            .get(self.ical_import_calendar_index)
+            .map(|calendar| calendar.id.clone())
+        else {
+            self.set_status("No calendar selected for import.", true);
+            return;
+        };
+
+        self.loading = true;
+        self.set_status(format!("Importing {}…", path), false);
+        self.worker
+            .import_ical(calendar_id, path, crate::time::local_timezone_name());
     }
 
     // ── Google ────────────────────────────────────────────────────
