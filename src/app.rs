@@ -415,25 +415,24 @@ impl App {
                 self.loading = false;
                 self.set_status("Google calendar discovery updated.", false);
             }
-            WorkerResult::GoogleSyncComplete {
+            WorkerResult::GoogleSyncFinished {
+                calendars_succeeded,
+                calendars_failed,
                 events_added,
                 events_updated,
                 conflicts_detected,
             } => {
-                let status = if conflicts_detected > 0 {
-                    format!(
-                        "Google sync: +{} events, {} updated, {} conflicts.",
-                        events_added, events_updated, conflicts_detected
-                    )
-                } else {
-                    format!(
-                        "Google sync: +{} events, {} updated.",
-                        events_added, events_updated
-                    )
-                };
-                self.set_status(status, false);
                 self.worker.load_events(self.view_year, self.view_month);
                 self.worker.load_calendar_sync_states();
+                let (status, is_error) = google_sync_finished_status(
+                    calendars_succeeded,
+                    calendars_failed,
+                    events_added,
+                    events_updated,
+                    conflicts_detected,
+                );
+                self.set_status(status, is_error);
+                self.loading = false;
             }
             WorkerResult::IcalImported(report) => {
                 self.worker.load_events(self.view_year, self.view_month);
@@ -1211,4 +1210,63 @@ fn days_in_month(year: i32, month: u32) -> u32 {
         .and_then(|d| d.pred_opt())
         .map(|d| d.day())
         .unwrap_or(30)
+}
+
+fn google_sync_finished_status(
+    calendars_succeeded: usize,
+    calendars_failed: usize,
+    events_added: usize,
+    events_updated: usize,
+    conflicts_detected: usize,
+) -> (String, bool) {
+    if calendars_failed > 0 {
+        let mut parts = Vec::new();
+        if calendars_succeeded > 0 {
+            parts.push(format!("{} succeeded", calendars_succeeded));
+        }
+        parts.push(format!("{} failed", calendars_failed));
+        if conflicts_detected > 0 {
+            parts.push(format!("{} conflicts", conflicts_detected));
+        }
+        return (
+            format!(
+                "Google sync finished with failures: {}. Open Google management for details.",
+                parts.join(", ")
+            ),
+            true,
+        );
+    }
+
+    let status = if conflicts_detected > 0 {
+        format!(
+            "Google sync: +{} events, {} updated, {} conflicts.",
+            events_added, events_updated, conflicts_detected
+        )
+    } else {
+        format!(
+            "Google sync: +{} events, {} updated.",
+            events_added, events_updated
+        )
+    };
+    (status, false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::google_sync_finished_status;
+
+    #[test]
+    fn google_sync_finished_status_prefers_failure_over_success_banner() {
+        let (message, is_error) = google_sync_finished_status(1, 1, 2, 3, 0);
+        assert!(is_error);
+        assert!(message.contains("1 succeeded"));
+        assert!(message.contains("1 failed"));
+    }
+
+    #[test]
+    fn google_sync_finished_status_reports_success_totals() {
+        let (message, is_error) = google_sync_finished_status(2, 0, 4, 5, 1);
+        assert!(!is_error);
+        assert_eq!(message, "Google sync: +4 events, 5 updated, 1 conflicts.");
+    }
 }

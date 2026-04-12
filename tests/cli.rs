@@ -927,4 +927,9 @@ fn google_conflicts_can_be_listed_and_resolved_keep_local() {
         .unwrap()
         .unwrap();
     assert_eq!(outbox.operation.to_string(), "update");
+    let refreshed = db::get_event_including_deleted(&conn, &event.id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(refreshed.google_id.as_deref(), Some("remote-1"));
+    assert_eq!(refreshed.google_etag.as_deref(), Some("\"etag-2\""));
 }

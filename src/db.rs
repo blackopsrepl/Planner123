@@ -750,6 +750,24 @@ pub fn update_event_from_sync(conn: &Connection, ev: &Event) -> Result<()> {
     Ok(())
 }
 
+pub fn update_event_google_version(
+    conn: &Connection,
+    event_id: &str,
+    google_id: Option<&str>,
+    google_etag: Option<&str>,
+) -> Result<()> {
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    conn.execute(
+        "UPDATE events SET
+             google_id = ?2,
+             google_etag = ?3,
+             updated_at = ?4
+         WHERE id = ?1",
+        rusqlite::params![event_id, google_id, google_etag, now],
+    )?;
+    Ok(())
+}
+
 pub fn get_dependency(conn: &Connection, dependency_id: &str) -> Result<Option<EventDependency>> {
     let mut stmt = conn.prepare(
         "SELECT id, from_event_id, to_event_id, dependency_type, created_at, updated_at

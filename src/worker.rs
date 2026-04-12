@@ -18,7 +18,9 @@ pub enum WorkerResult {
     EventDeleted(String),
     GoogleAuthComplete(Arc<crate::google::auth::GoogleClient>),
     GoogleCalendarsDiscovered(Vec<crate::google::discovery::DiscoveredGoogleCalendar>),
-    GoogleSyncComplete {
+    GoogleSyncFinished {
+        calendars_succeeded: usize,
+        calendars_failed: usize,
         events_added: usize,
         events_updated: usize,
         conflicts_detected: usize,
@@ -246,19 +248,24 @@ impl Worker {
     ) {
         let tx = self.tx.clone();
         self.rt.spawn(async move {
+            let mut calendars_succeeded = 0usize;
+            let mut calendars_failed = 0usize;
+            let mut events_added = 0usize;
+            let mut events_updated = 0usize;
+            let mut conflicts_detected = 0usize;
             for cal in calendars
                 .iter()
                 .filter(|c| c.source == crate::models::CalendarSource::Google)
             {
                 match crate::google::sync::sync_calendar(google_client.as_ref(), cal).await {
                     Ok(report) => {
-                        let _ = tx.send(WorkerResult::GoogleSyncComplete {
-                            events_added: report.events_added,
-                            events_updated: report.events_updated + report.pushed_updates,
-                            conflicts_detected: report.conflicts_detected,
-                        });
+                        calendars_succeeded += 1;
+                        events_added += report.events_added;
+                        events_updated += report.events_updated + report.pushed_updates;
+                        conflicts_detected += report.conflicts_detected;
                     }
                     Err(e) => {
+                        calendars_failed += 1;
                         if let Ok(conn) = crate::db::open() {
                             let _ = crate::sync::engine::mark_calendar_sync_error(
                                 &conn,
@@ -266,16 +273,16 @@ impl Worker {
                                 &e.to_string(),
                             );
                         }
-                        let _ = tx.send(WorkerResult::Error(format!(
-                            "Google sync failed for '{}': {}",
-                            cal.name, e
-                        )));
                     }
                 }
             }
-            let _ = tx.send(WorkerResult::StatusMessage(
-                "Google sync complete.".to_string(),
-            ));
+            let _ = tx.send(WorkerResult::GoogleSyncFinished {
+                calendars_succeeded,
+                calendars_failed,
+                events_added,
+                events_updated,
+                conflicts_detected,
+            });
         });
     }
 
