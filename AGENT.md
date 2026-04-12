@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository contains a Linux-first Rust desktop calendar with two supported entrypoints:
+This repository contains a Linux-first Rust calendar with two supported entrypoints:
 
 - `solverforge-calendar`: ratatui TUI application
 - `solverforge-calendar-cli`: non-interactive JSON CLI for agents and automation
@@ -15,7 +15,7 @@ This repository contains a Linux-first Rust desktop calendar with two supported 
 - `make test`: run all tests
 - `make lint`: run formatting and clippy checks
 - `make ci-local`: match the GitHub Actions CI workflow locally
-- `make pre-release`: run release-oriented validation before cutting or tagging a version
+- `make pre-release`: run release-oriented validation before tagging
 
 Direct cargo commands used in CI:
 
@@ -26,21 +26,27 @@ Direct cargo commands used in CI:
 
 ## Repo map
 
+- `PRD.md`: current product requirements for the v0.4.x milestone
 - `src/main.rs`: TUI entrypoint
 - `src/bin/solverforge-calendar-cli.rs`: CLI entrypoint
-- `src/cli.rs`: typed CLI parsing, JSON responses, command dispatch, CLI tests
-- `src/calendar_service.rs`: shared calendar validation, Google import rules, and update semantics
-- `src/db.rs`: SQLite schema, migrations, CRUD helpers, default-calendar recovery
-- `src/google/`: OAuth, calendar discovery, sync fetch/apply logic, Google event translation
+- `src/app.rs`: TUI state machine and worker result handling
+- `src/cli.rs`: typed CLI parsing, JSON responses, and command dispatch
+- `src/calendar_service.rs`: shared calendar validation and Google import rules
+- `src/event_service.rs`: shared event validation, timezone normalization, and Google outbox rules
+- `src/ical.rs`: `.ics` import/export
+- `src/google/`: OAuth, calendar discovery, typed event API, and Google payload mapping
+- `src/sync/`: sync engine, pull, push, conflicts, and persisted sync state helpers
+- `src/db.rs`: SQLite schema, migrations, CRUD helpers, and sync metadata tables
 - `tests/cli.rs`: binary-level CLI integration tests
-- `docs/wireframes/`: ASCII wireframes for the TUI and CLI surfaces
+- `docs/wireframes/`: ASCII references for the CLI and TUI surfaces
 
 ## Constraints
 
-- Keep the CLI fully non-interactive. No prompts, no confirmation flows, no “choices”.
+- Keep the CLI fully non-interactive. No prompts, no confirmation flows, no choices.
 - Preserve `cargo run` as the TUI default path.
 - Keep agent automation explicit through `solverforge-calendar-cli` and `scripts/solverforge-calendar-cli`.
-- Prefer shared DB/business-rule fixes over CLI-only patches when behavior affects both the TUI and CLI.
+- Route event mutation behavior through shared services, not UI-local rules.
+- Treat Google sync as explicit and deterministic. No hidden auto-sync startup behavior.
 - Tests must stay deterministic. Do not add live Google API or real keyring dependencies to automated tests.
 
 ## Change checklist
@@ -56,4 +62,10 @@ If you touch the CLI contract, update:
 
 - `README.md`
 - `tests/cli.rs`
-- `docs/wireframes/cli.md` when the command surface or response model changes
+- `docs/wireframes/cli.md`
+
+If you touch Google sync or `.ics` behavior, update:
+
+- `README.md`
+- `PRD.md` if the planned scope changes
+- `docs/wireframes/tui.md` and `docs/wireframes/cli.md` when user-facing flows change

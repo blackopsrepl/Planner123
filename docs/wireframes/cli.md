@@ -12,7 +12,12 @@ Supported groups:
 - `projects`
 - `events`
 - `dependencies`
+- `google auth`
+- `google calendars`
 - `google sync`
+- `google sync-status`
+- `google conflicts`
+- `ical import`
 
 ## Success response
 
@@ -36,6 +41,8 @@ Supported groups:
 ## Behavioral notes
 
 - Parsing is strict: unknown flags and malformed values fail fast.
-- Destructive commands require flags instead of prompts.
-- `calendars delete` cannot remove the last active calendar.
-- `google sync` is non-interactive and must never depend on TUI state.
+- There are no prompts or interactive confirmations.
+- Destructive behavior stays explicit through flags or direct commands.
+- `google sync` is explicit and non-interactive.
+- `google sync-status` and `google conflicts` expose durable sync health for automation.
+- `ical import` returns structured counts plus warnings for skipped or unsupported ICS shapes.

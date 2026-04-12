@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## Unreleased
+
+### Features
+
+- compliant desktop Google OAuth, calendar discovery/import, and writable vs read-only calendar handling
+- true two-way Google sync with a durable outbox, ETag-based conflict detection, and CLI conflict resolution
+- timezone-correct event flows shared across the TUI, CLI, `.ics` import, and Google sync
+- real `.ics` import in both the CLI and the TUI, with warnings for unsupported ICS shapes
+
+### Documentation
+
+- align README, wireframes, help text, and contributor guidance with the current shipped behavior
+
 ## 0.3.0 (2026-04-06)
 
 

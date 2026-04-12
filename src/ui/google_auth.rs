@@ -35,11 +35,11 @@ pub fn render_google_auth(app: &App, frame: &mut Frame) {
     let mut lines: Vec<Line> = vec![
         Line::from(""),
         Line::from(vec![Span::styled(
-            "  To connect Google Calendar, you need a Google Cloud project",
+            "  Create Google OAuth credentials using the Desktop app type.",
             t.normal(),
         )]),
         Line::from(vec![Span::styled(
-            "  with the Calendar API enabled and OAuth2 credentials.",
+            "  SolverForge opens the system browser and stores the refresh token in the OS keyring.",
             t.normal(),
         )]),
         Line::from(""),
@@ -53,6 +53,10 @@ pub fn render_google_auth(app: &App, frame: &mut Frame) {
         )]),
         Line::from(vec![Span::styled(
             "  3. Create OAuth2 credentials (Desktop app)",
+            t.dimmed(),
+        )]),
+        Line::from(vec![Span::styled(
+            "  4. Scope used here: full Google Calendar access",
             t.dimmed(),
         )]),
         Line::from(""),
