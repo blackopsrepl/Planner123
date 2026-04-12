@@ -194,6 +194,29 @@ pub fn load_calendar_sync_state(
     .map_err(Into::into)
 }
 
+pub fn load_calendar_sync_states(conn: &Connection) -> Result<Vec<CalendarSyncState>> {
+    let mut stmt = conn.prepare(
+        "SELECT calendar_id, google_access_role, writable, last_synced_at,
+                last_sync_error_code, last_sync_error_message, created_at, updated_at
+         FROM calendar_sync_state
+         ORDER BY calendar_id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(CalendarSyncState {
+            calendar_id: row.get(0)?,
+            google_access_role: row.get(1)?,
+            writable: row.get::<_, i64>(2)? != 0,
+            last_synced_at: row.get(3)?,
+            last_sync_error_code: row.get(4)?,
+            last_sync_error_message: row.get(5)?,
+            created_at: row.get(6)?,
+            updated_at: row.get(7)?,
+        })
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(Into::into)
+}
+
 pub fn upsert_calendar_sync_state(conn: &Connection, state: &CalendarSyncState) -> Result<()> {
     let now = now_timestamp();
     conn.execute(

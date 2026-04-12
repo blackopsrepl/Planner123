@@ -8,6 +8,7 @@ use crate::{
     db,
     google::discovery::DiscoveredGoogleCalendar,
     models::{Calendar, CalendarSource},
+    sync::state::CalendarSyncState,
 };
 
 #[derive(Debug, Clone)]
@@ -156,8 +157,9 @@ pub fn import_google_calendar(
     calendar: &DiscoveredGoogleCalendar,
     position: Option<i64>,
 ) -> Result<Calendar, CalendarServiceError> {
-    create_calendar(
-        conn,
+    let tx = conn.unchecked_transaction().map_err(map_internal)?;
+    let imported = create_calendar(
+        &tx,
         CreateCalendarInput {
             name: calendar.name.clone(),
             color: calendar.color.clone(),
@@ -166,7 +168,23 @@ pub fn import_google_calendar(
             visible: true,
             position,
         },
+    )?;
+    crate::sync::state::upsert_calendar_sync_state(
+        &tx,
+        &CalendarSyncState {
+            calendar_id: imported.id.clone(),
+            google_access_role: calendar.access_role.clone(),
+            writable: calendar.writable,
+            last_synced_at: None,
+            last_sync_error_code: None,
+            last_sync_error_message: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+        },
     )
+    .map_err(map_internal)?;
+    tx.commit().map_err(map_internal)?;
+    Ok(imported)
 }
 
 pub fn filter_unimported_google_calendars(
@@ -328,6 +346,8 @@ mod tests {
             name: "Work".to_string(),
             color: "#50f872".to_string(),
             primary: false,
+            access_role: Some("writer".to_string()),
+            writable: true,
         };
 
         import_google_calendar(&conn, &discovered, None).unwrap();
@@ -338,6 +358,30 @@ mod tests {
                 "google calendar 'work@example.com' is already imported".to_string()
             )
         );
+    }
+
+    #[test]
+    fn import_google_calendar_persists_access_role_and_writability() {
+        let (_temp, conn) = open_test_db();
+        let imported = import_google_calendar(
+            &conn,
+            &DiscoveredGoogleCalendar {
+                google_id: "readonly@example.com".to_string(),
+                name: "Readonly".to_string(),
+                color: "#123456".to_string(),
+                primary: false,
+                access_role: Some("reader".to_string()),
+                writable: false,
+            },
+            None,
+        )
+        .unwrap();
+
+        let sync_state = crate::sync::state::load_calendar_sync_state(&conn, &imported.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(sync_state.google_access_role.as_deref(), Some("reader"));
+        assert!(!sync_state.writable);
     }
 
     #[test]
@@ -490,6 +534,8 @@ mod tests {
                 name: "Work".to_string(),
                 color: "#50f872".to_string(),
                 primary: false,
+                access_role: Some("writer".to_string()),
+                writable: true,
             },
             None,
         )
@@ -503,12 +549,16 @@ mod tests {
                     name: "Work".to_string(),
                     color: "#50f872".to_string(),
                     primary: false,
+                    access_role: Some("writer".to_string()),
+                    writable: true,
                 },
                 DiscoveredGoogleCalendar {
                     google_id: "personal@example.com".to_string(),
                     name: "Personal".to_string(),
                     color: "#ffaa00".to_string(),
                     primary: true,
+                    access_role: Some("reader".to_string()),
+                    writable: false,
                 },
             ],
         )

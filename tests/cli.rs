@@ -2,6 +2,7 @@ use assert_cmd::Command;
 use serde_json::Value;
 use std::path::Path;
 use tempfile::TempDir;
+use uuid::Uuid;
 
 fn cli_command(temp: &TempDir) -> Command {
     let mut cmd = Command::cargo_bin("solverforge-calendar-cli").unwrap();
@@ -45,6 +46,10 @@ fn create_google_calendar(temp: &TempDir, name: &str) -> String {
     assert!(created.status.success());
     let created_json = read_json(&created.stdout);
     created_json["data"]["id"].as_str().unwrap().to_string()
+}
+
+fn unique_keyring_service() -> String {
+    format!("solverforge-calendar-test-{}", Uuid::new_v4().simple())
 }
 
 #[test]
@@ -656,4 +661,80 @@ fn google_sync_runs_through_binary_with_test_override() {
     assert_eq!(json["data"]["calendars_synced"], 1);
     assert_eq!(json["data"]["events_added"], 4);
     assert_eq!(json["data"]["events_updated"], 2);
+}
+
+#[test]
+fn google_auth_status_reports_disconnected_with_isolated_keyring() {
+    let temp = TempDir::new().unwrap();
+    let output = cli_command(&temp)
+        .env(
+            "SOLVERFORGE_CALENDAR_TEST_KEYRING_SERVICE",
+            unique_keyring_service(),
+        )
+        .args(["google", "auth", "status"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json = read_json(&output.stdout);
+    assert_eq!(json["status"], "ok");
+    assert_eq!(json["data"]["state"], "disconnected");
+    assert_eq!(json["data"]["has_refresh_token"], false);
+}
+
+#[test]
+fn google_calendar_discovery_and_import_use_test_override() {
+    let temp = TempDir::new().unwrap();
+    let discovery = r##"[
+      {
+        "google_id": "writer@example.com",
+        "name": "Writer",
+        "color": "#123456",
+        "primary": true,
+        "access_role": "writer",
+        "writable": true
+      },
+      {
+        "google_id": "reader@example.com",
+        "name": "Reader",
+        "color": "#654321",
+        "primary": false,
+        "access_role": "reader",
+        "writable": false
+      }
+    ]"##;
+
+    let discovered = cli_command(&temp)
+        .env("SOLVERFORGE_CALENDAR_TEST_GOOGLE_DISCOVERY", discovery)
+        .args(["google", "calendars", "discover"])
+        .output()
+        .unwrap();
+    assert!(discovered.status.success());
+    let discovered_json = read_json(&discovered.stdout);
+    assert_eq!(discovered_json["data"][0]["writable"], true);
+    assert_eq!(discovered_json["data"][1]["access_role"], "reader");
+    assert_eq!(discovered_json["data"][1]["imported"], false);
+
+    let imported = cli_command(&temp)
+        .env("SOLVERFORGE_CALENDAR_TEST_GOOGLE_DISCOVERY", discovery)
+        .args([
+            "google",
+            "calendars",
+            "import",
+            "--google-id",
+            "reader@example.com",
+        ])
+        .output()
+        .unwrap();
+    assert!(imported.status.success());
+    let imported_json = read_json(&imported.stdout);
+    assert_eq!(
+        imported_json["data"]["calendar"]["google_id"],
+        "reader@example.com"
+    );
+    assert_eq!(
+        imported_json["data"]["sync_state"]["google_access_role"],
+        "reader"
+    );
+    assert_eq!(imported_json["data"]["sync_state"]["writable"], false);
 }

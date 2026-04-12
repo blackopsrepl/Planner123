@@ -11,6 +11,7 @@ pub enum View {
     EventForm,
     QuickAdd,
     Help,
+    GoogleManage,
     GoogleAuth,
 }
 
@@ -64,7 +65,12 @@ pub enum Action {
     InputCancel,
 
     // ── Google Calendar ──────────────────────────────────────────
+    GoogleManage,
     GoogleSync,
+    GoogleDiscoverCalendars,
+    GoogleImportCalendar,
+    GoogleLogin,
+    GoogleAuthLogout,
 
     // ── iCal import/export ───────────────────────────────────────
     ImportIcal,
@@ -104,6 +110,7 @@ pub fn resolve(view: &View, key: KeyEvent) -> Action {
         View::EventForm => resolve_event_form(key),
         View::QuickAdd => resolve_input(key),
         View::Help => resolve_help(key),
+        View::GoogleManage => resolve_google_manage(key),
         View::GoogleAuth => resolve_google_auth(key),
     }
 }
@@ -131,7 +138,8 @@ fn resolve_month(key: KeyEvent) -> Action {
         Char('d') => Action::DeleteEvent,
         Enter => Action::SelectEvent,
         Char('/') => Action::QuickAdd,
-        Char('G') | Char('S') => Action::GoogleSync,
+        Char('G') => Action::GoogleManage,
+        Char('S') => Action::GoogleSync,
         Char('i') => Action::ImportIcal,
         Char('x') => Action::ExportIcal,
         Esc => Action::Escape,
@@ -159,7 +167,8 @@ fn resolve_time_grid(key: KeyEvent) -> Action {
         Char('d') => Action::DeleteEvent,
         Enter => Action::SelectEvent,
         Char('/') => Action::QuickAdd,
-        Char('G') | Char('S') => Action::GoogleSync,
+        Char('G') => Action::GoogleManage,
+        Char('S') => Action::GoogleSync,
         Esc => Action::Escape,
         PageUp => Action::ScrollPageUp,
         PageDown => Action::ScrollPageDown,
@@ -201,7 +210,8 @@ fn resolve_calendar_list(key: KeyEvent) -> Action {
         Char('j') | Down => Action::CalendarDown,
         Char(' ') => Action::ToggleCalendar,
         Char('c') => Action::CreateEvent,
-        Char('G') | Char('S') => Action::GoogleSync,
+        Char('G') => Action::GoogleManage,
+        Char('S') => Action::GoogleSync,
         Char('?') => Action::Help,
         _ => Action::None,
     }
@@ -256,6 +266,21 @@ fn resolve_google_auth(key: KeyEvent) -> Action {
     }
 }
 
+fn resolve_google_manage(key: KeyEvent) -> Action {
+    use KeyCode::*;
+    match key.code {
+        Esc | Char('q') => Action::Escape,
+        Char('k') | Up => Action::CalendarUp,
+        Char('j') | Down => Action::CalendarDown,
+        Char('r') => Action::GoogleDiscoverCalendars,
+        Char('i') | Enter => Action::GoogleImportCalendar,
+        Char('l') => Action::GoogleLogin,
+        Char('o') => Action::GoogleAuthLogout,
+        Char('s') | Char('S') => Action::GoogleSync,
+        _ => Action::None,
+    }
+}
+
 // ── Status bar hints ─────────────────────────────────────────────────
 
 /* Key hint tuple: (key label, description). */
@@ -305,6 +330,15 @@ pub fn hints(view: &View) -> Vec<Hint> {
         View::EventForm => vec![("Tab/↑↓", "field"), ("Enter", "save"), ("Esc", "cancel")],
         View::QuickAdd => vec![("Enter", "add"), ("Esc", "cancel")],
         View::Help => vec![("j/k", "scroll"), ("Esc", "close")],
+        View::GoogleManage => vec![
+            ("j/k", "nav"),
+            ("i", "import"),
+            ("r", "refresh"),
+            ("l", "login"),
+            ("o", "logout"),
+            ("s", "sync"),
+            ("Esc", "close"),
+        ],
         View::GoogleAuth => vec![("Tab", "field"), ("Enter", "confirm"), ("Esc", "cancel")],
     }
 }

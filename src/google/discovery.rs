@@ -11,6 +11,8 @@ pub struct DiscoveredGoogleCalendar {
     pub name: String,
     pub color: String,
     pub primary: bool,
+    pub access_role: Option<String>,
+    pub writable: bool,
 }
 
 pub async fn discover_calendars(client: &GoogleClient) -> Result<Vec<DiscoveredGoogleCalendar>> {
@@ -128,6 +130,8 @@ fn parse_calendar_item(item: &serde_json::Value) -> Option<DiscoveredGoogleCalen
         name: name.to_string(),
         color: color.to_string(),
         primary: item["primary"].as_bool().unwrap_or(false),
+        access_role: item["accessRole"].as_str().map(str::to_string),
+        writable: matches!(item["accessRole"].as_str(), Some("owner") | Some("writer")),
     })
 }
 
@@ -143,7 +147,8 @@ mod tests {
                     "id": "primary@example.com",
                     "summary": "Primary",
                     "backgroundColor": "#112233",
-                    "primary": true
+                    "primary": true,
+                    "accessRole": "writer"
                 },
                 {
                     "id": "fallback@example.com",
@@ -166,12 +171,16 @@ mod tests {
                     name: "Primary".to_string(),
                     color: "#112233".to_string(),
                     primary: true,
+                    access_role: Some("writer".to_string()),
+                    writable: true,
                 },
                 DiscoveredGoogleCalendar {
                     google_id: "fallback@example.com".to_string(),
                     name: "fallback@example.com".to_string(),
                     color: "#82FB9C".to_string(),
                     primary: false,
+                    access_role: None,
+                    writable: false,
                 },
             ]
         );

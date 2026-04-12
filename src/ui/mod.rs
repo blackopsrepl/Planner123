@@ -15,6 +15,7 @@ pub mod calendar_list;
 pub mod day_view;
 pub mod event_form;
 pub mod google_auth;
+pub mod google_manage;
 pub mod help;
 pub mod month_view;
 pub mod quick_add;
@@ -78,6 +79,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         View::GoogleAuth => {
             month_view::render_month(app, frame, content_area);
         }
+        View::GoogleManage => {
+            month_view::render_month(app, frame, content_area);
+        }
     }
 
     // ── Status / bottom bar ──────────────────────────────────────
@@ -90,6 +94,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     match &app.view {
         View::EventForm => event_form::render_event_form(app, frame),
         View::Help => help::render_help(app, frame),
+        View::GoogleManage => google_manage::render_google_manage(app, frame),
         View::GoogleAuth => google_auth::render_google_auth(app, frame),
         _ => {}
     }

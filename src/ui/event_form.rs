@@ -139,8 +139,19 @@ fn field_value(app: &App, field: &FormField, cursor: &str) -> String {
             .get(app.form_calendar_index)
             .map(|c| {
                 let source = match c.source {
-                    crate::models::CalendarSource::Local => "local",
-                    crate::models::CalendarSource::Google => "google",
+                    crate::models::CalendarSource::Local => "local".to_string(),
+                    crate::models::CalendarSource::Google => {
+                        if app
+                            .calendar_sync_state
+                            .get(&c.id)
+                            .map(|state| !state.writable)
+                            .unwrap_or(false)
+                        {
+                            "google read-only".to_string()
+                        } else {
+                            "google writable".to_string()
+                        }
+                    }
                 };
                 format!("{} [{}] (h/l)", c.name, source)
             })

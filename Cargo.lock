@@ -2743,6 +2743,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "base64",
  "chrono",
  "chrono-tz",
  "clap",
@@ -2761,6 +2762,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "tokio",
  "toml",

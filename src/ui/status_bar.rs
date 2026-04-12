@@ -86,7 +86,12 @@ pub fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
     } else {
         // Show today's time
         let now = Local::now().format("%H:%M").to_string();
-        Span::styled(format!(" {} ", now), t.dimmed())
+        let google_state = match crate::google::auth::auth_status().state {
+            crate::google::auth::GoogleAuthState::Connected => "google connected",
+            crate::google::auth::GoogleAuthState::NeedsReauth => "google reauth",
+            crate::google::auth::GoogleAuthState::Disconnected => "google off",
+        };
+        Span::styled(format!(" {}  {} ", google_state, now), t.dimmed())
     };
 
     // Left-align hints, right-align status (simplified: just concat)

@@ -8,6 +8,7 @@ use crate::models::{Calendar, Event, EventDependency, Project};
 #[derive(Debug)]
 pub enum WorkerResult {
     CalendarsLoaded(Vec<Calendar>),
+    CalendarSyncStatesLoaded(Vec<crate::sync::state::CalendarSyncState>),
     ProjectsLoaded(Vec<Project>),
     EventsLoaded {
         events: Vec<Event>,
@@ -16,6 +17,7 @@ pub enum WorkerResult {
     EventSaved(Box<Event>),
     EventDeleted(String),
     GoogleAuthComplete(Arc<crate::google::auth::GoogleClient>),
+    GoogleCalendarsDiscovered(Vec<crate::google::discovery::DiscoveredGoogleCalendar>),
     GoogleSyncComplete {
         events_added: usize,
         events_updated: usize,
@@ -57,6 +59,24 @@ impl Worker {
             match result {
                 Ok(cals) => {
                     let _ = tx.send(WorkerResult::CalendarsLoaded(cals));
+                }
+                Err(e) => {
+                    let _ = tx.send(WorkerResult::Error(e.to_string()));
+                }
+            }
+        });
+    }
+
+    pub fn load_calendar_sync_states(&self) {
+        let tx = self.tx.clone();
+        self.rt.spawn_blocking(move || {
+            let result = (|| -> Result<_> {
+                let conn = crate::db::open()?;
+                crate::sync::state::load_calendar_sync_states(&conn)
+            })();
+            match result {
+                Ok(states) => {
+                    let _ = tx.send(WorkerResult::CalendarSyncStatesLoaded(states));
                 }
                 Err(e) => {
                     let _ = tx.send(WorkerResult::Error(e.to_string()));
@@ -177,13 +197,38 @@ impl Worker {
     pub fn complete_google_auth(&self, client_id: String, client_secret: String) {
         let tx = self.tx.clone();
         self.rt.spawn(async move {
-            match crate::google::auth::authorize_and_persist(&client_id, &client_secret).await {
+            let client_secret = if client_secret.trim().is_empty() {
+                None
+            } else {
+                Some(client_secret.as_str())
+            };
+            match crate::google::auth::authorize_and_persist(&client_id, client_secret).await {
                 Ok(client) => {
                     let _ = tx.send(WorkerResult::GoogleAuthComplete(Arc::new(client)));
                 }
                 Err(e) => {
                     let _ = tx.send(WorkerResult::Error(format!(
                         "Google authorization failed: {}",
+                        e
+                    )));
+                }
+            }
+        });
+    }
+
+    pub fn discover_google_calendars(
+        &self,
+        google_client: std::sync::Arc<crate::google::auth::GoogleClient>,
+    ) {
+        let tx = self.tx.clone();
+        self.rt.spawn(async move {
+            match crate::google::discovery::discover_calendars(google_client.as_ref()).await {
+                Ok(calendars) => {
+                    let _ = tx.send(WorkerResult::GoogleCalendarsDiscovered(calendars));
+                }
+                Err(e) => {
+                    let _ = tx.send(WorkerResult::Error(format!(
+                        "Google calendar discovery failed: {}",
                         e
                     )));
                 }

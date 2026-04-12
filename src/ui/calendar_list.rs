@@ -53,10 +53,20 @@ fn render_calendars(app: &App, frame: &mut Frame, area: Rect, focused: bool) {
                 "\u{25cb} "
             }; // ● or ○
             let name = truncate(&cal.name, inner_width.saturating_sub(4));
-            let source_icon = if cal.source == crate::models::CalendarSource::Google {
-                " G"
-            } else {
-                ""
+            let source_icon = match cal.source {
+                crate::models::CalendarSource::Google => {
+                    if app
+                        .calendar_sync_state
+                        .get(&cal.id)
+                        .map(|state| !state.writable)
+                        .unwrap_or(false)
+                    {
+                        " G lock"
+                    } else {
+                        " G"
+                    }
+                }
+                crate::models::CalendarSource::Local => "",
             };
 
             let line = Line::from(vec![

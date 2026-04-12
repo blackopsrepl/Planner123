@@ -1,12 +1,14 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use chrono::{Datelike, Duration, Local, NaiveDate};
 use tokio::sync::RwLock;
 
 use crate::dag::EventDag;
+use crate::google::discovery::DiscoveredGoogleCalendar;
 use crate::keys::{Action, View};
 use crate::models::{Calendar, Event, EventDependency, Project};
+use crate::sync::state::CalendarSyncState;
 use crate::worker::{Worker, WorkerResult};
 
 // ── Form field definitions ────────────────────────────────────────────
@@ -77,6 +79,7 @@ pub struct App {
 
     // ── Data ─────────────────────────────────────────────────────
     pub calendars: Vec<Calendar>,
+    pub calendar_sync_state: HashMap<String, CalendarSyncState>,
     pub projects: Vec<Project>,
     pub events: Vec<Event>, // events in current view window
     pub dependencies: Vec<EventDependency>,
@@ -121,6 +124,8 @@ pub struct App {
     pub google_auth_client_secret: String,
     pub google_auth_field: usize, // 0 = client_id, 1 = client_secret
     pub google_client: Option<Arc<crate::google::auth::GoogleClient>>,
+    pub google_discovered_calendars: Vec<DiscoveredGoogleCalendar>,
+    pub google_discovery_index: usize,
 
     // ── Status / loading ──────────────────────────────────────────
     pub status_message: String,
@@ -149,6 +154,7 @@ impl App {
             week_scroll: 8, // default to showing 08:00
             selected_event_index: 0,
             calendars: Vec::new(),
+            calendar_sync_state: HashMap::new(),
             projects: Vec::new(),
             events: Vec::new(),
             dependencies: Vec::new(),
@@ -180,6 +186,8 @@ impl App {
             google_auth_client_secret: String::new(),
             google_auth_field: 0,
             google_client: None,
+            google_discovered_calendars: Vec::new(),
+            google_discovery_index: 0,
             status_message: String::new(),
             status_is_error: false,
             loading: true,
@@ -189,12 +197,18 @@ impl App {
         };
 
         // Load saved Google credentials if available
+        if let Some(saved) = crate::google::auth::GoogleClient::saved_credentials() {
+            app.google_auth_client_id = saved.client_id;
+            app.google_auth_client_secret = saved.client_secret.unwrap_or_default();
+        }
+
         if let Some(client) = crate::google::auth::GoogleClient::from_keyring() {
             app.google_client = Some(Arc::new(client));
         }
 
         // Kick off initial data load
         app.worker.load_calendars();
+        app.worker.load_calendar_sync_states();
         app.worker.load_projects();
         app.worker.load_dependencies();
 
@@ -257,12 +271,20 @@ impl App {
 
             // Sidebar
             Action::CalendarUp => {
-                if self.calendar_list_index > 0 {
+                if self.view == View::GoogleManage {
+                    if self.google_discovery_index > 0 {
+                        self.google_discovery_index -= 1;
+                    }
+                } else if self.calendar_list_index > 0 {
                     self.calendar_list_index -= 1;
                 }
             }
             Action::CalendarDown => {
-                if self.calendar_list_index + 1 < self.calendars.len() {
+                if self.view == View::GoogleManage {
+                    if self.google_discovery_index + 1 < self.google_discovered_calendars.len() {
+                        self.google_discovery_index += 1;
+                    }
+                } else if self.calendar_list_index + 1 < self.calendars.len() {
                     self.calendar_list_index += 1;
                 }
             }
@@ -281,7 +303,12 @@ impl App {
             }
 
             // Google
+            Action::GoogleManage => self.google_manage(),
             Action::GoogleSync => self.google_sync(),
+            Action::GoogleDiscoverCalendars => self.discover_google_calendars(),
+            Action::GoogleImportCalendar => self.import_selected_google_calendar(),
+            Action::GoogleLogin => self.view = View::GoogleAuth,
+            Action::GoogleAuthLogout => self.google_logout(),
 
             // iCal
             Action::ImportIcal => {
@@ -312,6 +339,12 @@ impl App {
                 self.worker.load_events(self.view_year, self.view_month);
                 self.loading = false; // spinner shows until EventsLoaded arrives
             }
+            WorkerResult::CalendarSyncStatesLoaded(states) => {
+                self.calendar_sync_state = states
+                    .into_iter()
+                    .map(|state| (state.calendar_id.clone(), state))
+                    .collect();
+            }
             WorkerResult::ProjectsLoaded(projs) => {
                 self.projects = projs;
             }
@@ -341,7 +374,20 @@ impl App {
             WorkerResult::GoogleAuthComplete(client) => {
                 self.google_client = Some(client);
                 self.set_status("Google authorization complete.", false);
+                self.view = View::GoogleManage;
+                self.worker.load_calendar_sync_states();
+                self.discover_google_calendars();
                 self.loading = false;
+            }
+            WorkerResult::GoogleCalendarsDiscovered(calendars) => {
+                self.google_discovered_calendars = calendars;
+                if self.google_discovery_index >= self.google_discovered_calendars.len() {
+                    self.google_discovery_index =
+                        self.google_discovered_calendars.len().saturating_sub(1);
+                }
+                self.view = View::GoogleManage;
+                self.loading = false;
+                self.set_status("Google calendar discovery updated.", false);
             }
             WorkerResult::GoogleSyncComplete {
                 events_added,
@@ -479,7 +525,11 @@ impl App {
 
     fn handle_escape(&mut self) {
         match self.view {
-            View::Help | View::EventForm | View::QuickAdd | View::GoogleAuth => {
+            View::Help
+            | View::EventForm
+            | View::QuickAdd
+            | View::GoogleAuth
+            | View::GoogleManage => {
                 self.view = View::Month;
             }
             View::CalendarList => {
@@ -795,6 +845,75 @@ impl App {
 
     // ── Google ────────────────────────────────────────────────────
 
+    fn google_manage(&mut self) {
+        if self.google_client.is_some() {
+            self.view = View::GoogleManage;
+            if self.google_discovered_calendars.is_empty() {
+                self.discover_google_calendars();
+            }
+        } else {
+            self.view = View::GoogleAuth;
+        }
+    }
+
+    fn discover_google_calendars(&mut self) {
+        let client_opt = self.google_client.clone();
+        if let Some(client) = client_opt {
+            self.loading = true;
+            self.set_status("Loading Google calendars…", false);
+            self.worker.discover_google_calendars(client);
+        } else {
+            self.view = View::GoogleAuth;
+        }
+    }
+
+    fn import_selected_google_calendar(&mut self) {
+        let Some(selected) = self
+            .google_discovered_calendars
+            .get(self.google_discovery_index)
+            .cloned()
+        else {
+            self.set_status("No Google calendar selected.", true);
+            return;
+        };
+
+        if self
+            .calendars
+            .iter()
+            .any(|calendar| calendar.google_id.as_deref() == Some(selected.google_id.as_str()))
+        {
+            self.set_status("Google calendar already imported.", true);
+            return;
+        }
+
+        match crate::db::open().and_then(|conn| {
+            crate::calendar_service::import_google_calendar(&conn, &selected, None)
+                .map_err(|e| anyhow::anyhow!(e.to_string()))
+        }) {
+            Ok(_) => {
+                self.worker.load_calendars();
+                self.worker.load_calendar_sync_states();
+                self.set_status(
+                    format!("Imported Google calendar '{}'.", selected.name),
+                    false,
+                );
+            }
+            Err(err) => self.set_status(format!("Google import failed: {}", err), true),
+        }
+    }
+
+    fn google_logout(&mut self) {
+        match crate::google::auth::GoogleClient::logout() {
+            Ok(_) => {
+                self.google_client = None;
+                self.google_discovered_calendars.clear();
+                self.view = View::Month;
+                self.set_status("Google disconnected.", false);
+            }
+            Err(err) => self.set_status(format!("Google logout failed: {}", err), true),
+        }
+    }
+
     fn google_sync(&mut self) {
         // Clone what we need before taking any mutable borrows
         let client_opt = self.google_client.clone();
@@ -822,13 +941,13 @@ impl App {
         let client_id = self.google_auth_client_id.clone();
         let client_secret = self.google_auth_client_secret.clone();
 
-        if client_id.is_empty() || client_secret.is_empty() {
-            self.set_status("Client ID and Secret are required.", true);
+        if client_id.is_empty() {
+            self.set_status("Client ID is required.", true);
             return;
         }
 
         self.set_status("Opening browser for Google authorization…", false);
-        self.view = View::Month;
+        self.view = View::GoogleManage;
         self.loading = true;
         self.worker.complete_google_auth(client_id, client_secret);
         self.set_status("Waiting for browser authorization…", false);

@@ -81,7 +81,28 @@ pub enum DependencyCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum GoogleCommand {
+    Auth {
+        #[command(subcommand)]
+        action: GoogleAuthCommand,
+    },
+    Calendars {
+        #[command(subcommand)]
+        action: GoogleCalendarCommand,
+    },
     Sync(GoogleSyncArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum GoogleAuthCommand {
+    Status,
+    Login(GoogleAuthLoginArgs),
+    Logout,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum GoogleCalendarCommand {
+    Discover,
+    Import(GoogleCalendarImportArgs),
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -262,6 +283,22 @@ pub struct GoogleSyncArgs {
     calendar_id: Option<String>,
 }
 
+#[derive(Debug, Args)]
+pub struct GoogleAuthLoginArgs {
+    #[arg(long)]
+    client_id: Option<String>,
+    #[arg(long)]
+    client_secret: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct GoogleCalendarImportArgs {
+    #[arg(long)]
+    google_id: String,
+    #[arg(long)]
+    position: Option<i64>,
+}
+
 #[derive(Debug, Clone)]
 pub struct CliError {
     pub code: &'static str,
@@ -338,6 +375,17 @@ struct SyncCalendarData {
     google_id: Option<String>,
     events_added: usize,
     events_updated: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct GoogleCalendarDiscoveryData {
+    google_id: String,
+    name: String,
+    color: String,
+    primary: bool,
+    access_role: Option<String>,
+    writable: bool,
+    imported: bool,
 }
 
 pub fn error_value(err: &CliError) -> Value {
@@ -748,6 +796,8 @@ fn handle_google_with_backend(
     google_sync_backend: &dyn GoogleSyncBackend,
 ) -> Result<Value, CliError> {
     match action {
+        GoogleCommand::Auth { action } => handle_google_auth(action),
+        GoogleCommand::Calendars { action } => handle_google_calendars(conn, action),
         GoogleCommand::Sync(args) => {
             let mut calendars: Vec<_> = db::load_calendars(conn)
                 .map_err(internal_error)?
@@ -794,6 +844,102 @@ fn handle_google_with_backend(
             }))
         }
     }
+}
+
+fn handle_google_auth(action: GoogleAuthCommand) -> Result<Value, CliError> {
+    match action {
+        GoogleAuthCommand::Status => Ok(json!(google::auth::auth_status())),
+        GoogleAuthCommand::Login(args) => {
+            let saved = google::auth::GoogleClient::saved_credentials();
+            let client_id = args
+                .client_id
+                .or_else(|| saved.as_ref().map(|saved| saved.client_id.clone()))
+                .ok_or_else(|| {
+                    CliError::validation(
+                        "google auth login requires --client-id or saved credentials",
+                    )
+                })?;
+            let client_secret = args
+                .client_secret
+                .or_else(|| saved.as_ref().and_then(|saved| saved.client_secret.clone()));
+            let runtime = google_runtime()?;
+            runtime
+                .block_on(google::auth::authorize_and_persist(
+                    &client_id,
+                    client_secret.as_deref(),
+                ))
+                .map_err(|e| CliError::external(e.to_string()))?;
+            Ok(json!(google::auth::auth_status()))
+        }
+        GoogleAuthCommand::Logout => {
+            let status = google::auth::GoogleClient::logout().map_err(internal_error)?;
+            Ok(json!(status))
+        }
+    }
+}
+
+fn handle_google_calendars(
+    conn: &Connection,
+    action: GoogleCalendarCommand,
+) -> Result<Value, CliError> {
+    match action {
+        GoogleCalendarCommand::Discover => {
+            let discovered = discover_google_calendars()?;
+            let imported_google_ids = db::load_calendars(conn)
+                .map_err(internal_error)?
+                .into_iter()
+                .filter(|calendar| calendar.source == models::CalendarSource::Google)
+                .filter_map(|calendar| calendar.google_id)
+                .collect::<std::collections::HashSet<_>>();
+            let results = discovered
+                .into_iter()
+                .map(|calendar| GoogleCalendarDiscoveryData {
+                    imported: imported_google_ids.contains(&calendar.google_id),
+                    google_id: calendar.google_id,
+                    name: calendar.name,
+                    color: calendar.color,
+                    primary: calendar.primary,
+                    access_role: calendar.access_role,
+                    writable: calendar.writable,
+                })
+                .collect::<Vec<_>>();
+            Ok(json!(results))
+        }
+        GoogleCalendarCommand::Import(args) => {
+            let calendar = discover_google_calendars()?
+                .into_iter()
+                .find(|calendar| calendar.google_id == args.google_id)
+                .ok_or_else(|| CliError::not_found("google calendar", &args.google_id))?;
+            let imported = calendar_service::import_google_calendar(conn, &calendar, args.position)
+                .map_err(calendar_service_error)?;
+            let sync_state = crate::sync::state::load_calendar_sync_state(conn, &imported.id)
+                .map_err(internal_error)?;
+            Ok(json!({
+                "calendar": imported,
+                "sync_state": sync_state,
+            }))
+        }
+    }
+}
+
+fn discover_google_calendars() -> Result<Vec<google::discovery::DiscoveredGoogleCalendar>, CliError>
+{
+    if let Some(discovered) = google_discovery_override()? {
+        return Ok(discovered);
+    }
+
+    let client = google::auth::GoogleClient::from_keyring()
+        .ok_or_else(|| CliError::external("google credentials are not configured in keyring"))?;
+    let runtime = google_runtime()?;
+    runtime
+        .block_on(google::discovery::discover_calendars(&client))
+        .map_err(|e| CliError::external(e.to_string()))
+}
+
+fn google_runtime() -> Result<tokio::runtime::Runtime, CliError> {
+    tokio::runtime::Runtime::new()
+        .context("failed to start tokio runtime")
+        .map_err(|e| CliError::internal(e.to_string()))
 }
 
 trait GoogleSyncBackend {
@@ -880,6 +1026,42 @@ fn google_sync_override_result(
             Ok((result.added.unwrap_or(0), result.updated.unwrap_or(0)))
         }
     }))
+}
+
+#[derive(Debug, Deserialize)]
+struct GoogleDiscoveryOverrideItem {
+    google_id: String,
+    name: String,
+    color: String,
+    #[serde(default)]
+    primary: bool,
+    #[serde(default)]
+    access_role: Option<String>,
+    #[serde(default)]
+    writable: bool,
+}
+
+fn google_discovery_override(
+) -> Result<Option<Vec<google::discovery::DiscoveredGoogleCalendar>>, CliError> {
+    let Ok(raw) = std::env::var("SOLVERFORGE_CALENDAR_TEST_GOOGLE_DISCOVERY") else {
+        return Ok(None);
+    };
+
+    let parsed: Vec<GoogleDiscoveryOverrideItem> = serde_json::from_str(&raw)
+        .map_err(|e| CliError::internal(format!("invalid google discovery override: {}", e)))?;
+    Ok(Some(
+        parsed
+            .into_iter()
+            .map(|calendar| google::discovery::DiscoveredGoogleCalendar {
+                google_id: calendar.google_id,
+                name: calendar.name,
+                color: calendar.color,
+                primary: calendar.primary,
+                access_role: calendar.access_role,
+                writable: calendar.writable,
+            })
+            .collect(),
+    ))
 }
 
 fn timestamp_now() -> String {
