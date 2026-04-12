@@ -5,6 +5,7 @@ use rusqlite::{Connection, Row};
 
 const MIGRATION_V1: &str = "20260101000001";
 const MIGRATION_V2: &str = "20260406000001";
+const MIGRATION_V3: &str = "20260412000001";
 
 /* Path to the calendar database. */
 pub fn db_path() -> PathBuf {
@@ -59,6 +60,11 @@ fn migrate(conn: &Connection) -> Result<()> {
     if !migration_applied(conn, MIGRATION_V2)? {
         migrate_v2(conn)?;
         record_migration(conn, MIGRATION_V2)?;
+    }
+
+    if !migration_applied(conn, MIGRATION_V3)? {
+        migrate_v3(conn)?;
+        record_migration(conn, MIGRATION_V3)?;
     }
 
     Ok(())
@@ -197,6 +203,72 @@ fn migrate_v2(conn: &Connection) -> Result<()> {
             ON events(calendar_id, google_id)
             WHERE deleted_at IS NULL
               AND google_id IS NOT NULL;
+        ",
+    )?;
+
+    Ok(())
+}
+
+fn migrate_v3(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS calendar_sync_state (
+            calendar_id              TEXT PRIMARY KEY REFERENCES calendars(id) ON DELETE CASCADE,
+            google_access_role       TEXT,
+            writable                 INTEGER NOT NULL DEFAULT 1,
+            last_synced_at           TEXT,
+            last_sync_error_code     TEXT,
+            last_sync_error_message  TEXT,
+            created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now')),
+            updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS event_sync_state (
+            event_id                 TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+            sync_state               TEXT NOT NULL DEFAULT 'clean',
+            last_synced_at           TEXT,
+            last_push_attempt_at     TEXT,
+            last_remote_modified_at  TEXT,
+            last_sync_error_code     TEXT,
+            last_sync_error_message  TEXT,
+            remote_payload           TEXT,
+            created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now')),
+            updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS sync_outbox (
+            id                  TEXT PRIMARY KEY,
+            provider            TEXT NOT NULL,
+            calendar_id         TEXT NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,
+            event_id            TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+            operation           TEXT NOT NULL,
+            enqueued_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now')),
+            attempt_count       INTEGER NOT NULL DEFAULT 0,
+            last_attempt_at     TEXT,
+            last_error_code     TEXT,
+            last_error_message  TEXT,
+            UNIQUE(provider, event_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_sync_outbox_provider_enqueued_at
+            ON sync_outbox(provider, enqueued_at, id);
+
+        CREATE TABLE IF NOT EXISTS sync_conflicts (
+            id                   TEXT PRIMARY KEY,
+            event_id             TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+            calendar_id          TEXT NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,
+            local_snapshot       TEXT NOT NULL,
+            remote_snapshot      TEXT NOT NULL,
+            remote_etag          TEXT,
+            detected_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now')),
+            resolution_status    TEXT NOT NULL DEFAULT 'pending',
+            resolution_strategy  TEXT,
+            resolved_at          TEXT
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_conflicts_event_pending_unique
+            ON sync_conflicts(event_id)
+            WHERE resolution_status = 'pending';
         ",
     )?;
 
@@ -761,6 +833,26 @@ pub fn detach_google_sync_state_for_calendar(conn: &Connection, calendar_id: &st
          WHERE calendar_id = ?1
            AND (google_id IS NOT NULL OR google_etag IS NOT NULL)",
         [calendar_id, &now],
+    )?;
+    conn.execute(
+        "DELETE FROM sync_outbox
+         WHERE calendar_id = ?1",
+        [calendar_id],
+    )?;
+    conn.execute(
+        "DELETE FROM event_sync_state
+         WHERE event_id IN (SELECT id FROM events WHERE calendar_id = ?1)",
+        [calendar_id],
+    )?;
+    conn.execute(
+        "DELETE FROM sync_conflicts
+         WHERE calendar_id = ?1",
+        [calendar_id],
+    )?;
+    conn.execute(
+        "DELETE FROM calendar_sync_state
+         WHERE calendar_id = ?1",
+        [calendar_id],
     )?;
     delete_sync_token(conn, calendar_id)?;
     Ok(())

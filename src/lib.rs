@@ -13,6 +13,7 @@ pub mod keys;
 pub mod models;
 pub mod notifications;
 pub mod recurrence;
+pub mod sync;
 pub mod theme;
 pub mod time;
 pub mod ui;
