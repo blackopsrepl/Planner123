@@ -732,7 +732,7 @@ fn google_auth_status_reports_disconnected_with_isolated_keyring() {
     let json = read_json(&output.stdout);
     assert_eq!(json["status"], "ok");
     assert_eq!(json["data"]["state"], "disconnected");
-    assert_eq!(json["data"]["has_refresh_token"], false);
+    assert!(!json["data"]["has_refresh_token"].as_bool().unwrap());
 }
 
 #[test]
@@ -764,9 +764,9 @@ fn google_calendar_discovery_and_import_use_test_override() {
         .unwrap();
     assert!(discovered.status.success());
     let discovered_json = read_json(&discovered.stdout);
-    assert_eq!(discovered_json["data"][0]["writable"], true);
+    assert!(discovered_json["data"][0]["writable"].as_bool().unwrap());
     assert_eq!(discovered_json["data"][1]["access_role"], "reader");
-    assert_eq!(discovered_json["data"][1]["imported"], false);
+    assert!(!discovered_json["data"][1]["imported"].as_bool().unwrap());
 
     let imported = cli_command(&temp)
         .env("SOLVERFORGE_CALENDAR_TEST_GOOGLE_DISCOVERY", discovery)
@@ -789,7 +789,9 @@ fn google_calendar_discovery_and_import_use_test_override() {
         imported_json["data"]["sync_state"]["google_access_role"],
         "reader"
     );
-    assert_eq!(imported_json["data"]["sync_state"]["writable"], false);
+    assert!(!imported_json["data"]["sync_state"]["writable"]
+        .as_bool()
+        .unwrap());
 }
 
 #[test]
