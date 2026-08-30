@@ -834,3 +834,8 @@ The implementation must follow current official Google documentation, especially
   `https://developers.google.com/workspace/calendar/api/guides/errors`
 - Calendar API versioned resources and conditional modification guidance
   `https://developers.google.com/workspace/calendar/api/guides/version-resources`
+# SolverForge Planner Inbox
+
+The calendar includes an explicit Planner Inbox for unscheduled, contiguous tasks. A batch solve creates a persistent review proposal and only explicit apply creates events. Existing event creation, quick-add, and explicit Google synchronization remain unchanged.
+
+The planner treats all active calendars as busy time, requires successful explicit Google sync state for active Google calendars, and uses configured weekly availability as a hard boundary. Priority, soft deadlines, cognitive preferred windows, and high-cognitive recovery streaks are optimization preferences; hard deadlines and dependencies remain hard constraints.

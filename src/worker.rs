@@ -28,6 +28,9 @@ pub enum WorkerResult {
     IcalImported(crate::ical::ImportReport),
     Error(String),
     StatusMessage(String),
+    PlannerTasksLoaded(Vec<crate::models::PlanningTask>),
+    PlannerProposalReady(crate::planner::ProposalDetail),
+    PlannerProposalApplied(crate::planner::ProposalDetail),
 }
 
 pub struct Worker {
@@ -120,6 +123,85 @@ impl Worker {
                 }
                 Err(e) => {
                     let _ = tx.send(WorkerResult::Error(e.to_string()));
+                }
+            }
+        });
+    }
+
+    pub fn load_planner_tasks(&self) {
+        let tx = self.tx.clone();
+        self.rt.spawn_blocking(move || {
+            let result = (|| -> Result<_> {
+                let conn = crate::db::open()?;
+                crate::planner::list_tasks(&conn).map_err(anyhow::Error::from)
+            })();
+            match result {
+                Ok(tasks) => {
+                    let _ = tx.send(WorkerResult::PlannerTasksLoaded(tasks));
+                }
+                Err(error) => {
+                    let _ = tx.send(WorkerResult::Error(error.to_string()));
+                }
+            }
+        });
+    }
+
+    pub fn optimize_planner(&self) {
+        let tx = self.tx.clone();
+        self.rt.spawn_blocking(move || {
+            let result = (|| -> Result<_> {
+                let conn = crate::db::open()?;
+                crate::planner::optimize(&conn, None).map_err(anyhow::Error::from)
+            })();
+            match result {
+                Ok(proposal) => {
+                    let _ = tx.send(WorkerResult::PlannerProposalReady(proposal));
+                }
+                Err(error) => {
+                    let _ = tx.send(WorkerResult::Error(error.to_string()));
+                }
+            }
+        });
+    }
+
+    pub fn create_planner_task(&self, input: crate::planner::CreateTaskInput) {
+        let tx = self.tx.clone();
+        self.rt.spawn_blocking(move || {
+            let result = (|| -> Result<_> {
+                let conn = crate::db::open()?;
+                let task =
+                    crate::planner::create_task(&conn, input).map_err(anyhow::Error::from)?;
+                let tasks = crate::planner::list_tasks(&conn).map_err(anyhow::Error::from)?;
+                Ok::<_, anyhow::Error>((task, tasks))
+            })();
+            match result {
+                Ok((task, tasks)) => {
+                    let _ = tx.send(WorkerResult::StatusMessage(format!(
+                        "Task added to Planner Inbox: {}",
+                        task.title
+                    )));
+                    let _ = tx.send(WorkerResult::PlannerTasksLoaded(tasks));
+                }
+                Err(error) => {
+                    let _ = tx.send(WorkerResult::Error(error.to_string()));
+                }
+            }
+        });
+    }
+
+    pub fn apply_planner_proposal(&self, proposal_id: String) {
+        let tx = self.tx.clone();
+        self.rt.spawn_blocking(move || {
+            let result = (|| -> Result<_> {
+                let conn = crate::db::open()?;
+                crate::planner::apply_proposal(&conn, &proposal_id).map_err(anyhow::Error::from)
+            })();
+            match result {
+                Ok(proposal) => {
+                    let _ = tx.send(WorkerResult::PlannerProposalApplied(proposal));
+                }
+                Err(error) => {
+                    let _ = tx.send(WorkerResult::Error(error.to_string()));
                 }
             }
         });

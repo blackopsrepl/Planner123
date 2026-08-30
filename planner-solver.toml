@@ -1,0 +1,21 @@
+[termination]
+seconds_spent_limit = 5
+
+[[phases]]
+type = "construction_heuristic"
+construction_heuristic_type = "first_fit"
+construction_obligation = "assign_when_candidate_exists"
+group_name = "planner_assignment"
+value_candidate_limit = 256
+group_candidate_limit = 256
+
+[[phases]]
+type = "local_search"
+
+[phases.termination]
+step_count_limit = 200
+
+[phases.move_selector]
+type = "grouped_scalar_move_selector"
+group_name = "planner_assignment"
+max_moves_per_step = 256

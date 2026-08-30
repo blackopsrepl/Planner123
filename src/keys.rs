@@ -14,6 +14,8 @@ pub enum View {
     Help,
     GoogleManage,
     GoogleAuth,
+    PlannerInbox,
+    PlannerTaskForm,
 }
 
 /* Every user-facing action the app can take. */
@@ -77,6 +79,12 @@ pub enum Action {
     ImportIcal,
     ExportIcal,
 
+    // ── Planner inbox ───────────────────────────────────────────
+    PlannerInbox,
+    CreateTask,
+    PlannerOptimize,
+    PlannerApply,
+
     // ── Scroll (help, agenda) ────────────────────────────────────
     ScrollUp,
     ScrollDown,
@@ -114,6 +122,8 @@ pub fn resolve(view: &View, key: KeyEvent) -> Action {
         View::Help => resolve_help(key),
         View::GoogleManage => resolve_google_manage(key),
         View::GoogleAuth => resolve_google_auth(key),
+        View::PlannerInbox => resolve_planner_inbox(key),
+        View::PlannerTaskForm => resolve_event_form(key),
     }
 }
 
@@ -144,6 +154,7 @@ fn resolve_month(key: KeyEvent) -> Action {
         Char('S') => Action::GoogleSync,
         Char('i') => Action::ImportIcal,
         Char('x') => Action::ExportIcal,
+        Char('p') => Action::PlannerInbox,
         Esc => Action::Escape,
         _ => Action::None,
     }
@@ -173,6 +184,7 @@ fn resolve_time_grid(key: KeyEvent) -> Action {
         Char('S') => Action::GoogleSync,
         Char('i') => Action::ImportIcal,
         Char('x') => Action::ExportIcal,
+        Char('p') => Action::PlannerInbox,
         Esc => Action::Escape,
         PageUp => Action::ScrollPageUp,
         PageDown => Action::ScrollPageDown,
@@ -202,6 +214,7 @@ fn resolve_agenda(key: KeyEvent) -> Action {
         Char('S') => Action::GoogleSync,
         Char('i') => Action::ImportIcal,
         Char('x') => Action::ExportIcal,
+        Char('p') => Action::PlannerInbox,
         PageUp => Action::ScrollPageUp,
         PageDown => Action::ScrollPageDown,
         Esc => Action::Escape,
@@ -304,6 +317,19 @@ fn resolve_google_manage(key: KeyEvent) -> Action {
     }
 }
 
+fn resolve_planner_inbox(key: KeyEvent) -> Action {
+    use KeyCode::*;
+    match key.code {
+        Esc | Char('q') => Action::Escape,
+        Char('n') => Action::CreateTask,
+        Char('o') => Action::PlannerOptimize,
+        Char('a') => Action::PlannerApply,
+        Char('j') | Down => Action::NextUnit,
+        Char('k') | Up => Action::PrevUnit,
+        _ => Action::None,
+    }
+}
+
 // ── Status bar hints ─────────────────────────────────────────────────
 
 /* Key hint tuple: (key label, description). */
@@ -364,5 +390,12 @@ pub fn hints(view: &View) -> Vec<Hint> {
             ("Esc", "close"),
         ],
         View::GoogleAuth => vec![("Tab", "field"), ("Enter", "confirm"), ("Esc", "cancel")],
+        View::PlannerInbox => vec![
+            ("n", "new task"),
+            ("o", "optimize"),
+            ("a", "apply"),
+            ("Esc", "close"),
+        ],
+        View::PlannerTaskForm => vec![("Tab/↑↓", "field"), ("Enter", "save"), ("Esc", "cancel")],
     }
 }

@@ -34,3 +34,8 @@
 - Read-only Google calendars stay visible but reject local edits.
 - Google conflicts are surfaced in the status bar and Google management view.
 - `.ics` import is explicit through `i` and targets the selected calendar.
+# Planner Inbox
+
+`p` opens a dedicated planner surface; it does not alter event quick-add or event forms. `n` opens a task form with title, duration, target calendar, priority, and cognitive load. `o` runs the batch optimizer and displays a proposal with timing and fatigue explanations. `a` applies the reviewed proposal explicitly.
+
+Planner configuration, including weekly availability and cognitive windows, is exposed through the JSON CLI so automation and the TUI share one persisted setting source.

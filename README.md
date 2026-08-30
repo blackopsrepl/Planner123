@@ -46,6 +46,7 @@ cargo run --bin solverforge-calendar-cli -- calendars list
 - Non-blocking I/O: background workers for DB and Google operations in the TUI
 - Local SQLite database: events, calendars, projects stored in `~/.local/share/solverforge/calendar.db`
 - Desktop notifications: reminder alerts via libnotify
+- SolverForge Planner Inbox: structured tasks, explicit batch proposals, cognitive-time preferences, and review-before-apply scheduling
 
 ## Keybindings
 
@@ -74,6 +75,15 @@ cargo run --bin solverforge-calendar-cli -- calendars list
 - `d`: delete selected event
 - `Enter`: open or select
 - `/`: quick-add event title into the focused date
+
+### Planner Inbox
+
+- `p`: open the Planner Inbox
+- `n`: add a structured planner task
+- `o`: run an explicit SolverForge optimization batch
+- `a`: apply the reviewed proposal
+
+Planner tasks are separate from events: `/` and `c` retain their existing event workflows. Configure availability and cognitive preferences through the CLI before the first batch. Google calendars remain explicit: sync them first, then optimize.
 
 ### Google Management
 
@@ -117,6 +127,28 @@ cargo run --bin solverforge-calendar-cli -- ical import \
   --path ./sample.ics
 ```
 
+# Planner inbox and SolverForge proposals
+cargo run --bin solverforge-calendar-cli -- planner settings update \
+  --timezone Europe/Rome \
+  --availability-json '{"mon":[{"start":"09:00","end":"17:00"}]}' \
+  --cognitive-enabled true --high-window-start 08:00 --high-window-end 12:00 \
+  --high-outside-penalty 1 --high-streak-limit 1 --recovery-minutes 30
+cargo run --bin solverforge-calendar-cli -- tasks create \
+  --title 'Design review' --duration-minutes 60 --target-calendar-id <calendar-id> \
+  --priority high --cognitive-load high
+cargo run --bin solverforge-calendar-cli -- planner optimize
+cargo run --bin solverforge-calendar-cli -- planner proposals list
+cargo run --bin solverforge-calendar-cli -- planner proposals apply <proposal-id>
+```
+
+Planner behavior:
+
+- All active calendars are busy-time constraints; writable target calendar selection remains explicit per task.
+- A proposal changes nothing until `planner proposals apply` is run.
+- Cognitive windows and high-load streaks are soft preferences. They never override availability, precedence, or hard deadlines.
+- Applied planner tasks remain fixed. `tasks return-to-inbox <task-id>` explicitly deletes only that task's linked event through the normal sync outbox.
+- Active Google calendars require a previously successful explicit sync before optimization. Applying a proposal never auto-syncs.
+
 Available groups:
 
 - `calendars`: `list`, `get`, `create`, `update`, `delete`
@@ -127,6 +159,9 @@ Available groups:
 - `google calendars`: `discover`, `import`
 - `google`: `sync`, `sync-status`, `conflicts list`, `conflicts resolve`
 - `ical`: `import`
+- `tasks`: `list`, `get`, `create`, `update`, `delete`, `return-to-inbox`, `dependencies`
+- `planner settings`: `show`, `update`
+- `planner`: `optimize`, `proposals list`, `proposals get`, `proposals apply`
 
 ## Google Calendar Setup
 

@@ -19,6 +19,7 @@ pub mod google_manage;
 pub mod help;
 pub mod ical_import;
 pub mod month_view;
+pub mod planner;
 pub mod quick_add;
 pub mod status_bar;
 pub mod util;
@@ -86,6 +87,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         View::GoogleManage => {
             month_view::render_month(app, frame, content_area);
         }
+        View::PlannerInbox => planner::render_inbox(app, frame, content_area),
+        View::PlannerTaskForm => planner::render_inbox(app, frame, content_area),
     }
 
     // ── Status / bottom bar ──────────────────────────────────────
@@ -101,6 +104,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         View::GoogleManage => google_manage::render_google_manage(app, frame),
         View::GoogleAuth => google_auth::render_google_auth(app, frame),
         View::IcalImport => ical_import::render_ical_import(app, frame),
+        View::PlannerTaskForm => planner::render_task_form(app, frame),
         _ => {}
     }
 }

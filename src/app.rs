@@ -8,6 +8,7 @@ use crate::dag::EventDag;
 use crate::google::discovery::DiscoveredGoogleCalendar;
 use crate::keys::{Action, View};
 use crate::models::{Calendar, Event, EventDependency, Project};
+use crate::models::{CognitiveLoad, PlanningTask, TaskPriority};
 use crate::sync::state::CalendarSyncState;
 use crate::worker::{Worker, WorkerResult};
 
@@ -83,6 +84,17 @@ pub struct App {
     pub projects: Vec<Project>,
     pub events: Vec<Event>, // events in current view window
     pub dependencies: Vec<EventDependency>,
+    pub planner_tasks: Vec<PlanningTask>,
+    pub planner_proposal: Option<crate::planner::ProposalDetail>,
+    pub planner_selected_index: usize,
+
+    // ── Planner task form state ──────────────────────────────────
+    pub planner_task_field: usize,
+    pub planner_task_title: String,
+    pub planner_task_duration: String,
+    pub planner_task_calendar_index: usize,
+    pub planner_task_priority_index: usize,
+    pub planner_task_cognitive_index: usize,
     pub dag: EventDag,
     pub completed_event_ids: HashSet<String>,
 
@@ -163,6 +175,15 @@ impl App {
             projects: Vec::new(),
             events: Vec::new(),
             dependencies: Vec::new(),
+            planner_tasks: Vec::new(),
+            planner_proposal: None,
+            planner_selected_index: 0,
+            planner_task_field: 0,
+            planner_task_title: String::new(),
+            planner_task_duration: "60".to_string(),
+            planner_task_calendar_index: 0,
+            planner_task_priority_index: 1,
+            planner_task_cognitive_index: 1,
             dag: EventDag::new(),
             completed_event_ids: HashSet::new(),
             sidebar_focused: false,
@@ -219,6 +240,7 @@ impl App {
         app.worker.load_calendar_sync_states();
         app.worker.load_projects();
         app.worker.load_dependencies();
+        app.worker.load_planner_tasks();
 
         app
     }
@@ -241,6 +263,10 @@ impl App {
             Action::ViewWeek => self.switch_view(View::Week),
             Action::ViewDay => self.switch_view(View::Day),
             Action::ViewAgenda => self.switch_view(View::Agenda),
+            Action::PlannerInbox => {
+                self.view = View::PlannerInbox;
+                self.worker.load_planner_tasks();
+            }
 
             // Focus
             Action::FocusSidebar => {
@@ -275,6 +301,7 @@ impl App {
                     }
                 }
                 View::IcalImport => self.ical_import_next_field(),
+                View::PlannerTaskForm => self.planner_task_next_field(),
                 _ => self.form_next_field(),
             },
             Action::FormPrevField => match self.view {
@@ -284,16 +311,30 @@ impl App {
                     }
                 }
                 View::IcalImport => self.ical_import_prev_field(),
+                View::PlannerTaskForm => self.planner_task_prev_field(),
                 _ => self.form_prev_field(),
             },
             Action::FormSubmit => match self.view {
                 View::GoogleAuth => self.handle_input_submit(),
                 View::IcalImport => self.ical_import_submit(),
+                View::PlannerTaskForm => self.planner_task_submit(),
                 _ => self.form_submit(),
             },
             Action::FormCancel => self.handle_escape(),
-            Action::InputChar(c) => self.form_input_char(c),
-            Action::InputBackspace => self.form_input_backspace(),
+            Action::InputChar(c) => {
+                if self.view == View::PlannerTaskForm {
+                    self.planner_task_input_char(c)
+                } else {
+                    self.form_input_char(c)
+                }
+            }
+            Action::InputBackspace => {
+                if self.view == View::PlannerTaskForm {
+                    self.planner_task_input_backspace()
+                } else {
+                    self.form_input_backspace()
+                }
+            }
             Action::InputSubmit => self.handle_input_submit(),
             Action::InputCancel => self.handle_escape(),
 
@@ -342,6 +383,21 @@ impl App {
             Action::ImportIcal => self.open_ical_import(),
             Action::ExportIcal => self.export_ical(),
 
+            Action::CreateTask => self.open_planner_task_form(),
+            Action::PlannerOptimize => {
+                self.loading = true;
+                self.worker.optimize_planner();
+            }
+            Action::PlannerApply => {
+                if let Some(proposal) = &self.planner_proposal {
+                    self.loading = true;
+                    self.worker
+                        .apply_planner_proposal(proposal.proposal.id.clone());
+                } else {
+                    self.set_status("No proposal is ready to apply.", true);
+                }
+            }
+
             Action::None | Action::JumpToDate => {}
         }
     }
@@ -386,6 +442,27 @@ impl App {
             WorkerResult::DependenciesLoaded(deps) => {
                 self.dag = EventDag::from_dependencies(&deps);
                 self.dependencies = deps;
+            }
+            WorkerResult::PlannerTasksLoaded(tasks) => {
+                self.planner_tasks = tasks;
+                self.planner_selected_index = self
+                    .planner_selected_index
+                    .min(self.planner_tasks.len().saturating_sub(1));
+            }
+            WorkerResult::PlannerProposalReady(proposal) => {
+                self.planner_proposal = Some(proposal);
+                self.loading = false;
+                self.set_status(
+                    "Planner proposal is ready for review; press a to apply.",
+                    false,
+                );
+            }
+            WorkerResult::PlannerProposalApplied(proposal) => {
+                self.planner_proposal = Some(proposal);
+                self.worker.load_planner_tasks();
+                self.worker.load_events(self.view_year, self.view_month);
+                self.loading = false;
+                self.set_status("Scheduled planner tasks were applied.", false);
             }
             WorkerResult::EventSaved(ev) => {
                 // Refresh events for the current window
@@ -718,11 +795,7 @@ impl App {
             Some(FormField::Description) => self.form_description.push(c),
             Some(FormField::Timezone) => self.form_timezone.push(c),
             Some(FormField::Recurrence) => self.form_rrule.push(c),
-            Some(FormField::Reminder) => {
-                if c.is_ascii_digit() {
-                    self.form_reminder.push(c);
-                }
-            }
+            Some(FormField::Reminder) if c.is_ascii_digit() => self.form_reminder.push(c),
             Some(FormField::Calendar) => {
                 // Cycle through calendars with +/-
                 if c == '+' || c == 'l' {
@@ -742,11 +815,7 @@ impl App {
                     self.form_project_index -= 1;
                 }
             }
-            Some(FormField::AllDay) => {
-                if c == ' ' {
-                    self.form_all_day = !self.form_all_day;
-                }
-            }
+            Some(FormField::AllDay) if c == ' ' => self.form_all_day = !self.form_all_day,
             _ => {}
         }
     }
@@ -1103,6 +1172,87 @@ impl App {
         }
     }
 
+    fn open_planner_task_form(&mut self) {
+        self.planner_task_field = 0;
+        self.planner_task_title.clear();
+        self.planner_task_duration = "60".to_string();
+        self.planner_task_calendar_index = 0;
+        self.planner_task_priority_index = 1;
+        self.planner_task_cognitive_index = 1;
+        self.view = View::PlannerTaskForm;
+    }
+
+    fn planner_task_next_field(&mut self) {
+        self.planner_task_field = (self.planner_task_field + 1) % 5;
+    }
+
+    fn planner_task_prev_field(&mut self) {
+        self.planner_task_field = self.planner_task_field.checked_sub(1).unwrap_or(4);
+    }
+
+    fn planner_task_input_char(&mut self, c: char) {
+        match self.planner_task_field {
+            0 => self.planner_task_title.push(c),
+            1 if c.is_ascii_digit() => self.planner_task_duration.push(c),
+            2 if !self.calendars.is_empty() => {
+                self.planner_task_calendar_index =
+                    (self.planner_task_calendar_index + 1) % self.calendars.len();
+            }
+            3 => self.planner_task_priority_index = (self.planner_task_priority_index + 1) % 3,
+            4 => self.planner_task_cognitive_index = (self.planner_task_cognitive_index + 1) % 3,
+            _ => {}
+        }
+    }
+
+    fn planner_task_input_backspace(&mut self) {
+        match self.planner_task_field {
+            0 => {
+                self.planner_task_title.pop();
+            }
+            1 => {
+                self.planner_task_duration.pop();
+            }
+            _ => {}
+        }
+    }
+
+    fn planner_task_submit(&mut self) {
+        let Some(calendar) = self.calendars.get(self.planner_task_calendar_index) else {
+            self.set_status("Create a calendar before adding a planner task.", true);
+            return;
+        };
+        let duration_minutes = match self.planner_task_duration.parse() {
+            Ok(value) if value > 0 => value,
+            _ => {
+                self.set_status("Task duration must be a positive number of minutes.", true);
+                return;
+            }
+        };
+        let priority = [TaskPriority::Low, TaskPriority::Normal, TaskPriority::High]
+            [self.planner_task_priority_index]
+            .clone();
+        let cognitive_load = [
+            CognitiveLoad::Low,
+            CognitiveLoad::Medium,
+            CognitiveLoad::High,
+        ][self.planner_task_cognitive_index]
+            .clone();
+        self.loading = true;
+        self.worker
+            .create_planner_task(crate::planner::CreateTaskInput {
+                title: self.planner_task_title.clone(),
+                duration_minutes,
+                target_calendar_id: calendar.id.clone(),
+                project_id: None,
+                priority,
+                cognitive_load,
+                earliest_at: None,
+                deadline_kind: crate::models::DeadlineKind::None,
+                deadline_at: None,
+            });
+        self.view = View::PlannerInbox;
+    }
+
     pub fn selected_event(&self) -> Option<&Event> {
         self.visible_events()
             .get(self.selected_event_index)
@@ -1160,11 +1310,7 @@ impl App {
         match self.view {
             View::Help => self.help_scroll = self.help_scroll.saturating_sub(1),
             View::Agenda => self.agenda_scroll = self.agenda_scroll.saturating_sub(1),
-            View::Week | View::Day => {
-                if self.week_scroll > 0 {
-                    self.week_scroll -= 1;
-                }
-            }
+            View::Week | View::Day if self.week_scroll > 0 => self.week_scroll -= 1,
             _ => {}
         }
     }
@@ -1173,11 +1319,7 @@ impl App {
         match self.view {
             View::Help => self.help_scroll = self.help_scroll.saturating_add(1),
             View::Agenda => self.agenda_scroll = self.agenda_scroll.saturating_add(1),
-            View::Week | View::Day => {
-                if self.week_scroll < 20 {
-                    self.week_scroll += 1;
-                }
-            }
+            View::Week | View::Day if self.week_scroll < 20 => self.week_scroll += 1,
             _ => {}
         }
     }

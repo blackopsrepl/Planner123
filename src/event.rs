@@ -30,22 +30,19 @@ impl EventHandler {
         thread::spawn(move || loop {
             if event::poll(tick_rate).unwrap_or(false) {
                 match event::read() {
-                    Ok(CrosstermEvent::Key(key)) => {
+                    Ok(CrosstermEvent::Key(key))
                         if key.kind == KeyEventKind::Press
-                            && event_tx.send(Event::Key(key)).is_err()
-                        {
-                            return;
-                        }
+                            && event_tx.send(Event::Key(key)).is_err() =>
+                    {
+                        return;
                     }
-                    Ok(CrosstermEvent::Mouse(mouse)) => {
-                        if event_tx.send(Event::Mouse(mouse)).is_err() {
-                            return;
-                        }
+                    Ok(CrosstermEvent::Mouse(mouse))
+                        if event_tx.send(Event::Mouse(mouse)).is_err() =>
+                    {
+                        return;
                     }
-                    Ok(CrosstermEvent::Resize(_, _)) => {
-                        if event_tx.send(Event::Resize).is_err() {
-                            return;
-                        }
+                    Ok(CrosstermEvent::Resize(_, _)) if event_tx.send(Event::Resize).is_err() => {
+                        return;
                     }
                     _ => {}
                 }
