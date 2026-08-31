@@ -660,6 +660,7 @@ impl App {
             | View::GoogleManage => {
                 self.view = View::Month;
             }
+            View::PlannerTaskForm => self.view = View::PlannerInbox,
             View::CalendarList => {
                 self.sidebar_focused = false;
                 self.view = View::Month;

@@ -541,6 +541,12 @@ pub fn record_local_event_save(
     previous_event: Option<&Event>,
     event: &Event,
 ) -> Result<()> {
+    if let Some(previous_event) = previous_event {
+        if previous_event.calendar_id != event.calendar_id && previous_event.google_id.is_some() {
+            bail!("moving synced Google events between calendars is not supported yet");
+        }
+    }
+
     if calendar.source != CalendarSource::Google {
         if event.google_id.is_none() {
             clear_event_sync_tracking(conn, &event.id)?;
@@ -550,12 +556,6 @@ pub fn record_local_event_save(
 
     if !google_calendar_writable(conn, calendar)? {
         bail!("calendar '{}' is read-only", calendar.name);
-    }
-
-    if let Some(previous_event) = previous_event {
-        if previous_event.calendar_id != event.calendar_id && previous_event.google_id.is_some() {
-            bail!("moving synced Google events between calendars is not supported yet");
-        }
     }
 
     let existing_outbox = get_outbox_entry(conn, GOOGLE_PROVIDER, &event.id)?;

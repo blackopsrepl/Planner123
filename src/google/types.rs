@@ -109,6 +109,7 @@ pub fn remote_updated_at(event: &GoogleEvent) -> Option<String> {
 
 pub fn local_event_insert_body(event: &Event) -> Result<serde_json::Value> {
     Ok(json!({
+        "id": google_create_id(event),
         "summary": event.title,
         "description": event.description,
         "location": event.location,
@@ -119,7 +120,22 @@ pub fn local_event_insert_body(event: &Event) -> Result<serde_json::Value> {
 }
 
 pub fn local_event_patch_body(event: &Event) -> Result<serde_json::Value> {
-    local_event_insert_body(event)
+    let mut body = local_event_insert_body(event)?;
+    body.as_object_mut()
+        .expect("insert body is an object")
+        .remove("id");
+    Ok(body)
+}
+
+pub fn google_create_id(event: &Event) -> String {
+    format!(
+        "sf{}",
+        event
+            .id
+            .chars()
+            .filter(|character| *character != '-')
+            .collect::<String>()
+    )
 }
 
 fn local_event_time_body(event: &Event, is_start: bool) -> Result<serde_json::Value> {

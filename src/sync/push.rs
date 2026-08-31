@@ -4,7 +4,10 @@ use crate::{
     db,
     google::{
         events_api::{self, GoogleApiError},
-        types::{local_event_insert_body, local_event_patch_body, remote_updated_at, GoogleEvent},
+        types::{
+            google_create_id, local_event_insert_body, local_event_patch_body, remote_updated_at,
+            GoogleEvent,
+        },
     },
     models::Calendar,
     sync::{
@@ -85,12 +88,24 @@ async fn process_entry(
 
     match entry.operation {
         OutboxOperation::Create => {
-            let remote = events_api::insert_event(
+            let remote = match events_api::insert_event(
                 access_token,
                 google_calendar_id,
                 &local_event_insert_body(&event).map_err(wrap_local_error)?,
             )
-            .await?;
+            .await
+            {
+                Ok(remote) => remote,
+                Err(error) if error.status.as_u16() == 409 => {
+                    events_api::get_event(
+                        access_token,
+                        google_calendar_id,
+                        &google_create_id(&event),
+                    )
+                    .await?
+                }
+                Err(error) => return Err(error),
+            };
             let conn = db::open().map_err(wrap_local_error)?;
             persist_remote_success(&conn, calendar, &event, &remote).map_err(wrap_local_error)?;
             Ok(OutboxOperation::Create)
