@@ -352,6 +352,7 @@ pub fn hints(view: &View) -> Vec<Hint> {
             ("d", "del"),
             ("1-4", "view"),
             ("Tab", "sidebar"),
+            ("p", "planner"),
             ("?", "help"),
         ],
         View::Week | View::Day => vec![
@@ -363,6 +364,7 @@ pub fn hints(view: &View) -> Vec<Hint> {
             ("d", "del"),
             ("1-4", "view"),
             ("Tab", "sidebar"),
+            ("p", "planner"),
             ("?", "help"),
         ],
         View::Agenda => vec![
@@ -372,6 +374,7 @@ pub fn hints(view: &View) -> Vec<Hint> {
             ("e", "edit"),
             ("d", "del"),
             ("1-4", "view"),
+            ("p", "planner"),
             ("?", "help"),
         ],
         View::CalendarList => vec![

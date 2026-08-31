@@ -697,6 +697,7 @@ impl App {
                 self.view = View::Month;
             }
             View::PlannerTaskForm | View::PlannerSettingsForm => self.view = View::PlannerInbox,
+            View::PlannerInbox => self.view = View::Month,
             View::CalendarList => {
                 self.sidebar_focused = false;
                 self.view = View::Month;
