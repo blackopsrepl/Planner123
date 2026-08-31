@@ -422,10 +422,16 @@ pub fn optimize(
     }
     validate_settings(&settings)?;
     let timezone_name = settings.timezone.clone().ok_or_else(|| {
-        PlannerError::Validation("configure planner timezone before optimizing".into())
+        PlannerError::Validation(
+            "configure a planner timezone before optimizing; use an IANA name such as Europe/Rome or UTC"
+                .into(),
+        )
     })?;
-    let timezone = Tz::from_str(&timezone_name)
-        .map_err(|_| PlannerError::Validation("invalid planner timezone".into()))?;
+    let timezone = Tz::from_str(&timezone_name).map_err(|_| {
+        PlannerError::Validation(
+            "planner timezone must be an IANA name such as Europe/Rome or UTC".into(),
+        )
+    })?;
     let availability: Availability = serde_json::from_str(&settings.availability_json)
         .map_err(|e| PlannerError::Validation(format!("invalid planner availability: {e}")))?;
     validate_availability(&availability)?;
@@ -955,7 +961,11 @@ fn require_task(conn: &Connection, id: &str) -> Result<PlanningTask, PlannerErro
     })
 }
 fn normalize_timezone(value: &str) -> Result<String, PlannerError> {
-    time::normalize_timezone(value).map_err(validation)
+    time::normalize_timezone(value).map_err(|_| {
+        PlannerError::Validation(
+            "planner timezone must be an IANA name such as Europe/Rome or UTC".into(),
+        )
+    })
 }
 
 fn canonical_settings_snapshot(settings: &PlannerSettings) -> Result<String, PlannerError> {
@@ -1665,6 +1675,24 @@ mod tests {
             &serde_json::from_str::<Availability>(&settings.availability_json).unwrap()
         )
         .is_err());
+    }
+
+    #[test]
+    fn planner_timezone_requires_an_iana_name() {
+        let (_temp, conn, _) = connection();
+        let error = update_settings(
+            &conn,
+            SettingsUpdate {
+                timezone: Some("Rome".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "planner timezone must be an IANA name such as Europe/Rome or UTC"
+        );
     }
 
     #[test]

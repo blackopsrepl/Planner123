@@ -407,6 +407,11 @@ impl App {
 
             Action::CreateTask => self.open_planner_task_form(),
             Action::PlannerOptimize => {
+                if let Some(message) = self.planner_optimization_prerequisite() {
+                    self.set_status(message, true);
+                    self.open_planner_settings_form();
+                    return;
+                }
                 self.loading = true;
                 self.worker.optimize_planner();
             }
@@ -473,7 +478,10 @@ impl App {
                     .min(self.planner_tasks.len().saturating_sub(1));
             }
             WorkerResult::PlannerSettingsLoaded(settings) => {
-                self.planner_settings_timezone = settings.timezone.clone().unwrap_or_default();
+                self.planner_settings_timezone = settings
+                    .timezone
+                    .clone()
+                    .unwrap_or_else(crate::time::local_timezone_name);
                 self.planner_settings_availability = serde_json::from_str::<
                     crate::planner::Availability,
                 >(&settings.availability_json)
@@ -1328,6 +1336,17 @@ impl App {
     }
 
     fn planner_settings_submit(&mut self) {
+        let timezone = match crate::time::normalize_timezone(self.planner_settings_timezone.trim())
+        {
+            Ok(timezone) => timezone,
+            Err(_) => {
+                self.set_status(
+                    "Timezone must be an IANA name such as Europe/Rome or UTC.",
+                    true,
+                );
+                return;
+            }
+        };
         let availability = match availability_from_specs(&self.planner_settings_availability) {
             Ok(value) => value,
             Err(message) => {
@@ -1365,7 +1384,7 @@ impl App {
         self.loading = true;
         self.worker
             .update_planner_settings(crate::planner::SettingsUpdate {
-                timezone: Some(self.planner_settings_timezone.clone()),
+                timezone: Some(timezone),
                 availability: Some(availability),
                 horizon_days: Some(horizon_days),
                 slot_minutes: Some(slot_minutes),
@@ -1373,6 +1392,28 @@ impl App {
                 ..Default::default()
             });
         self.view = View::PlannerInbox;
+    }
+
+    fn planner_optimization_prerequisite(&self) -> Option<String> {
+        let Some(settings) = self.planner_settings.as_ref() else {
+            return Some("Planner settings are loading; wait a moment, then optimize.".into());
+        };
+        let Some(timezone) = settings.timezone.as_deref() else {
+            return Some(
+                "Set a planner timezone first: use an IANA name such as Europe/Rome or UTC.".into(),
+            );
+        };
+        if crate::time::normalize_timezone(timezone).is_err() {
+            return Some(
+                "Correct the planner timezone: use an IANA name such as Europe/Rome or UTC.".into(),
+            );
+        }
+        let availability =
+            serde_json::from_str::<crate::planner::Availability>(&settings.availability_json);
+        match availability {
+            Ok(value) if !value.0.is_empty() => None,
+            _ => Some("Set at least one weekly availability window before optimizing.".into()),
+        }
     }
 
     pub fn selected_event(&self) -> Option<&Event> {

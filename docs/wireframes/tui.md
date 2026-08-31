@@ -36,6 +36,6 @@
 - `.ics` import is explicit through `i` and targets the selected calendar.
 # Planner Inbox
 
-`p` opens a dedicated planner surface; it does not alter event quick-add or event forms. `n` opens a task form with title, duration, target calendar, priority, and cognitive load. `s` opens Planner Settings for timezone, weekly availability, horizon, slot size, and solve time. `o` runs the batch optimizer and displays a proposal with timing and fatigue explanations. `a` applies the reviewed proposal explicitly.
+`p` opens a dedicated planner surface; it does not alter event quick-add or event forms. `n` opens a task form with title, duration, target calendar, priority, and cognitive load. `s` opens Planner Settings for timezone, weekly availability, horizon, slot size, and solve time. The timezone field explicitly requires an IANA name such as `Europe/Rome` or `UTC`, shows the detected system timezone, and validates before save. `o` opens settings instead of running if the persisted timezone or weekly availability is absent or invalid; otherwise it runs the batch optimizer and displays a proposal with timing and fatigue explanations. `a` applies the reviewed proposal explicitly.
 
 The TUI and JSON CLI share one persisted planner setting source. Weekly availability uses visual TUI editing or repeatable typed CLI values such as `--availability mon=09:00-17:00`.

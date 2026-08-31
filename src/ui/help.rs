@@ -132,6 +132,10 @@ fn build_help_lines() -> Vec<Line<'static>> {
         blank(),
         heading("PLANNER"),
         binding("p", "Open Planner Inbox"),
+        binding(
+            "Timezone",
+            "IANA name: Europe/Rome or UTC (detected local shown)",
+        ),
         binding("n", "Create planner task"),
         binding("s", "Configure planner settings"),
         binding("o", "Optimize inbox into a proposal"),

@@ -91,16 +91,16 @@ pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
 }
 
 pub fn render_settings_form(app: &App, frame: &mut Frame) {
-    let area = centered_rect(82, 58, frame.area());
+    let area = centered_rect(86, 68, frame.area());
     frame.render_widget(Clear, area);
     let rows = [
-        format!("Timezone: {}", app.planner_settings_timezone),
+        format!("Timezone (IANA name): {}", app.planner_settings_timezone),
         format!("Weekly availability: {}", app.planner_settings_availability),
         format!("Horizon days: {}", app.planner_settings_horizon_days),
         format!("Slot minutes: {}", app.planner_settings_slot_minutes),
         format!("Solve seconds: {}", app.planner_settings_solve_seconds),
     ];
-    let lines = rows
+    let mut lines = rows
         .into_iter()
         .enumerate()
         .map(|(index, row)| {
@@ -119,6 +119,13 @@ pub fn render_settings_form(app: &App, frame: &mut Frame) {
             ))
         })
         .collect::<Vec<_>>();
+    let local_timezone = crate::time::local_timezone_name();
+    lines.extend([
+        Line::from(""),
+        Line::from("Required: an IANA timezone name, for example Europe/Rome or UTC."),
+        Line::from(format!("Detected system timezone: {local_timezone}")),
+        Line::from("Enter validates and saves all settings. Esc cancels."),
+    ]);
     frame.render_widget(
         Paragraph::new(lines).block(
             Block::default()
