@@ -986,7 +986,7 @@ fn parse_clock(value: &str) -> Result<NaiveTime, PlannerError> {
     NaiveTime::parse_from_str(value, "%H:%M")
         .map_err(|_| PlannerError::Validation(format!("invalid time '{}'; expected HH:MM", value)))
 }
-fn validate_availability(value: &Availability) -> Result<(), PlannerError> {
+pub fn validate_availability(value: &Availability) -> Result<(), PlannerError> {
     if value.0.is_empty() {
         return Err(PlannerError::Validation(
             "configure at least one weekly availability window".into(),
@@ -1006,8 +1006,14 @@ fn validate_availability(value: &Availability) -> Result<(), PlannerError> {
             )));
         }
         for window in windows {
-            parse_clock(&window.start)?;
-            parse_clock(&window.end)?;
+            let start = parse_clock(&window.start)?;
+            let end = parse_clock(&window.end)?;
+            if end <= start {
+                return Err(PlannerError::Validation(format!(
+                    "availability on '{}' must end after it starts",
+                    day
+                )));
+            }
         }
     }
     Ok(())
@@ -1692,6 +1698,35 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "planner timezone must be an IANA name such as Europe/Rome or UTC"
+        );
+    }
+
+    #[test]
+    fn availability_requires_known_days_and_forward_time_windows() {
+        let invalid_day = Availability(BTreeMap::from([(
+            "mo".into(),
+            vec![TimeWindow {
+                start: "09:00".into(),
+                end: "17:00".into(),
+            }],
+        )]));
+        assert_eq!(
+            validate_availability(&invalid_day).unwrap_err().to_string(),
+            "invalid weekday 'mo'"
+        );
+
+        let backwards_window = Availability(BTreeMap::from([(
+            "mon".into(),
+            vec![TimeWindow {
+                start: "17:00".into(),
+                end: "09:00".into(),
+            }],
+        )]));
+        assert_eq!(
+            validate_availability(&backwards_window)
+                .unwrap_err()
+                .to_string(),
+            "availability on 'mon' must end after it starts"
         );
     }
 

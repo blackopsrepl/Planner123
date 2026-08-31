@@ -194,7 +194,7 @@ impl App {
             planner_task_cognitive_index: 1,
             planner_settings_field: 0,
             planner_settings_timezone: String::new(),
-            planner_settings_availability: String::new(),
+            planner_settings_availability: default_weekly_availability(),
             planner_settings_horizon_days: "14".into(),
             planner_settings_slot_minutes: "15".into(),
             planner_settings_solve_seconds: "5".into(),
@@ -486,7 +486,9 @@ impl App {
                     crate::planner::Availability,
                 >(&settings.availability_json)
                 .map(|availability| availability_to_specs(&availability))
-                .unwrap_or_default();
+                .ok()
+                .filter(|availability| !availability.is_empty())
+                .unwrap_or_else(default_weekly_availability);
                 self.planner_settings_horizon_days = settings.horizon_days.to_string();
                 self.planner_settings_slot_minutes = settings.slot_minutes.to_string();
                 self.planner_settings_solve_seconds = settings.solve_seconds.to_string();
@@ -1409,11 +1411,15 @@ impl App {
             );
         }
         let availability =
-            serde_json::from_str::<crate::planner::Availability>(&settings.availability_json);
-        match availability {
-            Ok(value) if !value.0.is_empty() => None,
-            _ => Some("Set at least one weekly availability window before optimizing.".into()),
+            match serde_json::from_str::<crate::planner::Availability>(&settings.availability_json)
+            {
+                Ok(value) => value,
+                Err(_) => return Some("Correct the weekly availability before optimizing.".into()),
+            };
+        if let Err(error) = crate::planner::validate_availability(&availability) {
+            return Some(format!("Correct weekly availability: {error}"));
         }
+        None
     }
 
     pub fn selected_event(&self) -> Option<&Event> {
@@ -1521,14 +1527,21 @@ fn availability_from_specs(value: &str) -> Result<crate::planner::Availability, 
         let (start, end) = window
             .split_once('-')
             .ok_or_else(|| "Availability uses day=HH:MM-HH:MM, separated by commas.".to_string())?;
-        days.entry(day.to_ascii_lowercase())
+        days.entry(day.trim().to_ascii_lowercase())
             .or_insert_with(Vec::new)
             .push(crate::planner::TimeWindow {
-                start: start.into(),
-                end: end.into(),
+                start: start.trim().into(),
+                end: end.trim().into(),
             });
     }
-    Ok(crate::planner::Availability(days))
+    let availability = crate::planner::Availability(days);
+    crate::planner::validate_availability(&availability)
+        .map_err(|error| format!("Weekly availability: {error}"))?;
+    Ok(availability)
+}
+
+fn default_weekly_availability() -> String {
+    "mon=09:00-17:00, tue=09:00-17:00, wed=09:00-17:00, thu=09:00-17:00, fri=09:00-17:00".into()
 }
 
 fn availability_to_specs(availability: &crate::planner::Availability) -> String {

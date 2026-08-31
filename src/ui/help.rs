@@ -136,6 +136,10 @@ fn build_help_lines() -> Vec<Line<'static>> {
             "Timezone",
             "IANA name: Europe/Rome or UTC (detected local shown)",
         ),
+        binding(
+            "Availability",
+            "day=HH:MM-HH:MM, comma-separated; e.g. mon=09:00-17:00 (full days accepted)",
+        ),
         binding("n", "Create planner task"),
         binding("s", "Configure planner settings"),
         binding("o", "Optimize inbox into a proposal"),

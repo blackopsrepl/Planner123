@@ -91,11 +91,14 @@ pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
 }
 
 pub fn render_settings_form(app: &App, frame: &mut Frame) {
-    let area = centered_rect(86, 68, frame.area());
+    let area = centered_rect(90, 82, frame.area());
     frame.render_widget(Clear, area);
     let rows = [
         format!("Timezone (IANA name): {}", app.planner_settings_timezone),
-        format!("Weekly availability: {}", app.planner_settings_availability),
+        format!(
+            "Weekly availability (weekly working windows): {}",
+            app.planner_settings_availability
+        ),
         format!("Horizon days: {}", app.planner_settings_horizon_days),
         format!("Slot minutes: {}", app.planner_settings_slot_minutes),
         format!("Solve seconds: {}", app.planner_settings_solve_seconds),
@@ -124,13 +127,20 @@ pub fn render_settings_form(app: &App, frame: &mut Frame) {
         Line::from(""),
         Line::from("Required: an IANA timezone name, for example Europe/Rome or UTC."),
         Line::from(format!("Detected system timezone: {local_timezone}")),
+        Line::from("Availability syntax: day=HH:MM-HH:MM; separate windows with commas."),
+        Line::from(
+            "Use mon through sun (or full names such as Monday). Example: mon=09:00-17:00, tue=09:00-17:00.",
+        ),
+        Line::from(
+            "Use a day more than once for split shifts; each window must end after it starts.",
+        ),
         Line::from("Enter validates and saves all settings. Esc cancels."),
     ]);
     frame.render_widget(
         Paragraph::new(lines).block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Planner Settings — availability: mon=09:00-17:00, tue=09:00-17:00 "),
+                .title(" Planner Settings "),
         ),
         area,
     );

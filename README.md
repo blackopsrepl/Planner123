@@ -80,7 +80,7 @@ cargo run --bin solverforge-calendar-cli -- calendars list
 
 - `p`: open the Planner Inbox
 - `n`: add a structured planner task
-- `s`: configure timezone, weekly availability, horizon, slot size, and solver time. Timezone is a required IANA name such as `Europe/Rome` or `UTC`; the settings form shows the detected local timezone as a starting point and validates it before saving.
+- `s`: configure timezone, weekly availability, horizon, slot size, and solver time. Timezone is a required IANA name such as `Europe/Rome` or `UTC`; the settings form shows the detected local timezone as a starting point and validates it before saving. Weekly availability uses comma-separated `day=HH:MM-HH:MM` windows, such as `mon=09:00-17:00, tue=09:00-17:00`; use `mon` through `sun` or full weekday names, and repeat a day for split shifts.
 - `o`: run an explicit SolverForge optimization batch
 - `a`: apply the reviewed proposal
 
