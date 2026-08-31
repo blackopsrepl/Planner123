@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use chrono::{Datelike, Duration, Local, NaiveDate};
@@ -86,6 +86,7 @@ pub struct App {
     pub dependencies: Vec<EventDependency>,
     pub planner_tasks: Vec<PlanningTask>,
     pub planner_proposal: Option<crate::planner::ProposalDetail>,
+    pub planner_settings: Option<crate::models::PlannerSettings>,
     pub planner_selected_index: usize,
 
     // ── Planner task form state ──────────────────────────────────
@@ -95,6 +96,12 @@ pub struct App {
     pub planner_task_calendar_index: usize,
     pub planner_task_priority_index: usize,
     pub planner_task_cognitive_index: usize,
+    pub planner_settings_field: usize,
+    pub planner_settings_timezone: String,
+    pub planner_settings_availability: String,
+    pub planner_settings_horizon_days: String,
+    pub planner_settings_slot_minutes: String,
+    pub planner_settings_solve_seconds: String,
     pub dag: EventDag,
     pub completed_event_ids: HashSet<String>,
 
@@ -177,6 +184,7 @@ impl App {
             dependencies: Vec::new(),
             planner_tasks: Vec::new(),
             planner_proposal: None,
+            planner_settings: None,
             planner_selected_index: 0,
             planner_task_field: 0,
             planner_task_title: String::new(),
@@ -184,6 +192,12 @@ impl App {
             planner_task_calendar_index: 0,
             planner_task_priority_index: 1,
             planner_task_cognitive_index: 1,
+            planner_settings_field: 0,
+            planner_settings_timezone: String::new(),
+            planner_settings_availability: String::new(),
+            planner_settings_horizon_days: "14".into(),
+            planner_settings_slot_minutes: "15".into(),
+            planner_settings_solve_seconds: "5".into(),
             dag: EventDag::new(),
             completed_event_ids: HashSet::new(),
             sidebar_focused: false,
@@ -266,6 +280,7 @@ impl App {
             Action::PlannerInbox => {
                 self.view = View::PlannerInbox;
                 self.worker.load_planner_tasks();
+                self.worker.load_planner_settings();
             }
 
             // Focus
@@ -302,6 +317,7 @@ impl App {
                 }
                 View::IcalImport => self.ical_import_next_field(),
                 View::PlannerTaskForm => self.planner_task_next_field(),
+                View::PlannerSettingsForm => self.planner_settings_next_field(),
                 _ => self.form_next_field(),
             },
             Action::FormPrevField => match self.view {
@@ -312,18 +328,22 @@ impl App {
                 }
                 View::IcalImport => self.ical_import_prev_field(),
                 View::PlannerTaskForm => self.planner_task_prev_field(),
+                View::PlannerSettingsForm => self.planner_settings_prev_field(),
                 _ => self.form_prev_field(),
             },
             Action::FormSubmit => match self.view {
                 View::GoogleAuth => self.handle_input_submit(),
                 View::IcalImport => self.ical_import_submit(),
                 View::PlannerTaskForm => self.planner_task_submit(),
+                View::PlannerSettingsForm => self.planner_settings_submit(),
                 _ => self.form_submit(),
             },
             Action::FormCancel => self.handle_escape(),
             Action::InputChar(c) => {
                 if self.view == View::PlannerTaskForm {
                     self.planner_task_input_char(c)
+                } else if self.view == View::PlannerSettingsForm {
+                    self.planner_settings_input_char(c)
                 } else {
                     self.form_input_char(c)
                 }
@@ -331,6 +351,8 @@ impl App {
             Action::InputBackspace => {
                 if self.view == View::PlannerTaskForm {
                     self.planner_task_input_backspace()
+                } else if self.view == View::PlannerSettingsForm {
+                    self.planner_settings_input_backspace()
                 } else {
                     self.form_input_backspace()
                 }
@@ -397,6 +419,7 @@ impl App {
                     self.set_status("No proposal is ready to apply.", true);
                 }
             }
+            Action::PlannerSettings => self.open_planner_settings_form(),
 
             Action::None | Action::JumpToDate => {}
         }
@@ -448,6 +471,19 @@ impl App {
                 self.planner_selected_index = self
                     .planner_selected_index
                     .min(self.planner_tasks.len().saturating_sub(1));
+            }
+            WorkerResult::PlannerSettingsLoaded(settings) => {
+                self.planner_settings_timezone = settings.timezone.clone().unwrap_or_default();
+                self.planner_settings_availability = serde_json::from_str::<
+                    crate::planner::Availability,
+                >(&settings.availability_json)
+                .map(|availability| availability_to_specs(&availability))
+                .unwrap_or_default();
+                self.planner_settings_horizon_days = settings.horizon_days.to_string();
+                self.planner_settings_slot_minutes = settings.slot_minutes.to_string();
+                self.planner_settings_solve_seconds = settings.solve_seconds.to_string();
+                self.planner_settings = Some(settings);
+                self.loading = false;
             }
             WorkerResult::PlannerProposalReady(proposal) => {
                 self.planner_proposal = Some(proposal);
@@ -660,7 +696,7 @@ impl App {
             | View::GoogleManage => {
                 self.view = View::Month;
             }
-            View::PlannerTaskForm => self.view = View::PlannerInbox,
+            View::PlannerTaskForm | View::PlannerSettingsForm => self.view = View::PlannerInbox,
             View::CalendarList => {
                 self.sidebar_focused = false;
                 self.view = View::Month;
@@ -1254,6 +1290,90 @@ impl App {
         self.view = View::PlannerInbox;
     }
 
+    fn open_planner_settings_form(&mut self) {
+        self.planner_settings_field = 0;
+        self.worker.load_planner_settings();
+        self.view = View::PlannerSettingsForm;
+    }
+
+    fn planner_settings_next_field(&mut self) {
+        self.planner_settings_field = (self.planner_settings_field + 1) % 5;
+    }
+
+    fn planner_settings_prev_field(&mut self) {
+        self.planner_settings_field = self.planner_settings_field.checked_sub(1).unwrap_or(4);
+    }
+
+    fn planner_settings_input_char(&mut self, character: char) {
+        match self.planner_settings_field {
+            0 => self.planner_settings_timezone.push(character),
+            1 => self.planner_settings_availability.push(character),
+            2 => self.planner_settings_horizon_days.push(character),
+            3 => self.planner_settings_slot_minutes.push(character),
+            4 => self.planner_settings_solve_seconds.push(character),
+            _ => {}
+        }
+    }
+
+    fn planner_settings_input_backspace(&mut self) {
+        match self.planner_settings_field {
+            0 => self.planner_settings_timezone.pop(),
+            1 => self.planner_settings_availability.pop(),
+            2 => self.planner_settings_horizon_days.pop(),
+            3 => self.planner_settings_slot_minutes.pop(),
+            4 => self.planner_settings_solve_seconds.pop(),
+            _ => None,
+        };
+    }
+
+    fn planner_settings_submit(&mut self) {
+        let availability = match availability_from_specs(&self.planner_settings_availability) {
+            Ok(value) => value,
+            Err(message) => {
+                self.set_status(message, true);
+                return;
+            }
+        };
+        let parse_number = |value: &str, label: &str| {
+            value
+                .parse::<i64>()
+                .map_err(|_| format!("{label} must be a whole number."))
+        };
+        let horizon_days = match parse_number(&self.planner_settings_horizon_days, "Horizon days") {
+            Ok(value) => value,
+            Err(message) => {
+                self.set_status(message, true);
+                return;
+            }
+        };
+        let slot_minutes = match parse_number(&self.planner_settings_slot_minutes, "Slot minutes") {
+            Ok(value) => value,
+            Err(message) => {
+                self.set_status(message, true);
+                return;
+            }
+        };
+        let solve_seconds =
+            match parse_number(&self.planner_settings_solve_seconds, "Solve seconds") {
+                Ok(value) => value,
+                Err(message) => {
+                    self.set_status(message, true);
+                    return;
+                }
+            };
+        self.loading = true;
+        self.worker
+            .update_planner_settings(crate::planner::SettingsUpdate {
+                timezone: Some(self.planner_settings_timezone.clone()),
+                availability: Some(availability),
+                horizon_days: Some(horizon_days),
+                slot_minutes: Some(slot_minutes),
+                solve_seconds: Some(solve_seconds),
+                ..Default::default()
+            });
+        self.view = View::PlannerInbox;
+    }
+
     pub fn selected_event(&self) -> Option<&Event> {
         self.visible_events()
             .get(self.selected_event_index)
@@ -1344,6 +1464,42 @@ impl App {
             _ => {}
         }
     }
+}
+
+fn availability_from_specs(value: &str) -> Result<crate::planner::Availability, String> {
+    let mut days = BTreeMap::new();
+    for spec in value
+        .split(',')
+        .map(str::trim)
+        .filter(|spec| !spec.is_empty())
+    {
+        let (day, window) = spec
+            .split_once('=')
+            .ok_or_else(|| "Availability uses day=HH:MM-HH:MM, separated by commas.".to_string())?;
+        let (start, end) = window
+            .split_once('-')
+            .ok_or_else(|| "Availability uses day=HH:MM-HH:MM, separated by commas.".to_string())?;
+        days.entry(day.to_ascii_lowercase())
+            .or_insert_with(Vec::new)
+            .push(crate::planner::TimeWindow {
+                start: start.into(),
+                end: end.into(),
+            });
+    }
+    Ok(crate::planner::Availability(days))
+}
+
+fn availability_to_specs(availability: &crate::planner::Availability) -> String {
+    availability
+        .0
+        .iter()
+        .flat_map(|(day, windows)| {
+            windows
+                .iter()
+                .map(move |window| format!("{day}={}-{}", window.start, window.end))
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn days_in_month(year: i32, month: u32) -> u32 {

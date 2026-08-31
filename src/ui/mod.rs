@@ -89,6 +89,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         }
         View::PlannerInbox => planner::render_inbox(app, frame, content_area),
         View::PlannerTaskForm => planner::render_inbox(app, frame, content_area),
+        View::PlannerSettingsForm => planner::render_inbox(app, frame, content_area),
     }
 
     // ── Status / bottom bar ──────────────────────────────────────
@@ -105,6 +106,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         View::GoogleAuth => google_auth::render_google_auth(app, frame),
         View::IcalImport => ical_import::render_ical_import(app, frame),
         View::PlannerTaskForm => planner::render_task_form(app, frame),
+        View::PlannerSettingsForm => planner::render_settings_form(app, frame),
         _ => {}
     }
 }

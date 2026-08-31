@@ -29,6 +29,7 @@ pub enum WorkerResult {
     Error(String),
     StatusMessage(String),
     PlannerTasksLoaded(Vec<crate::models::PlanningTask>),
+    PlannerSettingsLoaded(crate::models::PlannerSettings),
     PlannerProposalReady(crate::planner::ProposalDetail),
     PlannerProposalApplied(crate::planner::ProposalDetail),
 }
@@ -138,6 +139,42 @@ impl Worker {
             match result {
                 Ok(tasks) => {
                     let _ = tx.send(WorkerResult::PlannerTasksLoaded(tasks));
+                }
+                Err(error) => {
+                    let _ = tx.send(WorkerResult::Error(error.to_string()));
+                }
+            }
+        });
+    }
+
+    pub fn load_planner_settings(&self) {
+        let tx = self.tx.clone();
+        self.rt.spawn_blocking(move || {
+            let result = (|| -> Result<_> {
+                let conn = crate::db::open()?;
+                crate::planner::settings(&conn).map_err(Into::into)
+            })();
+            match result {
+                Ok(settings) => {
+                    let _ = tx.send(WorkerResult::PlannerSettingsLoaded(settings));
+                }
+                Err(error) => {
+                    let _ = tx.send(WorkerResult::Error(error.to_string()));
+                }
+            }
+        });
+    }
+
+    pub fn update_planner_settings(&self, update: crate::planner::SettingsUpdate) {
+        let tx = self.tx.clone();
+        self.rt.spawn_blocking(move || {
+            let result = (|| -> Result<_> {
+                let conn = crate::db::open()?;
+                crate::planner::update_settings(&conn, update).map_err(Into::into)
+            })();
+            match result {
+                Ok(settings) => {
+                    let _ = tx.send(WorkerResult::PlannerSettingsLoaded(settings));
                 }
                 Err(error) => {
                     let _ = tx.send(WorkerResult::Error(error.to_string()));

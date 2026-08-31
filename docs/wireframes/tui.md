@@ -36,6 +36,6 @@
 - `.ics` import is explicit through `i` and targets the selected calendar.
 # Planner Inbox
 
-`p` opens a dedicated planner surface; it does not alter event quick-add or event forms. `n` opens a task form with title, duration, target calendar, priority, and cognitive load. `o` runs the batch optimizer and displays a proposal with timing and fatigue explanations. `a` applies the reviewed proposal explicitly.
+`p` opens a dedicated planner surface; it does not alter event quick-add or event forms. `n` opens a task form with title, duration, target calendar, priority, and cognitive load. `s` opens Planner Settings for timezone, weekly availability, horizon, slot size, and solve time. `o` runs the batch optimizer and displays a proposal with timing and fatigue explanations. `a` applies the reviewed proposal explicitly.
 
-Planner configuration, including weekly availability and cognitive windows, is exposed through the JSON CLI so automation and the TUI share one persisted setting source.
+The TUI and JSON CLI share one persisted planner setting source. Weekly availability uses visual TUI editing or repeatable typed CLI values such as `--availability mon=09:00-17:00`.

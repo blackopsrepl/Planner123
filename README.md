@@ -80,10 +80,11 @@ cargo run --bin solverforge-calendar-cli -- calendars list
 
 - `p`: open the Planner Inbox
 - `n`: add a structured planner task
+- `s`: configure timezone, weekly availability, horizon, slot size, and solver time
 - `o`: run an explicit SolverForge optimization batch
 - `a`: apply the reviewed proposal
 
-Planner tasks are separate from events: `/` and `c` retain their existing event workflows. Configure availability and cognitive preferences through the CLI before the first batch. Google calendars remain explicit: sync them first, then optimize.
+Planner tasks are separate from events: `/` and `c` retain their existing event workflows. Configure availability in the Planner Inbox with `s` before the first batch. Google calendars remain explicit: sync them first, then optimize.
 
 ### Google Management
 
@@ -130,7 +131,7 @@ cargo run --bin solverforge-calendar-cli -- ical import \
 # Planner inbox and SolverForge proposals
 cargo run --bin solverforge-calendar-cli -- planner settings update \
   --timezone Europe/Rome \
-  --availability-json '{"mon":[{"start":"09:00","end":"17:00"}]}' \
+  --availability mon=09:00-17:00 \
   --cognitive-enabled true --high-window-start 08:00 --high-window-end 12:00 \
   --high-outside-penalty 1 --high-streak-limit 1 --recovery-minutes 30
 cargo run --bin solverforge-calendar-cli -- tasks create \

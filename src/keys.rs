@@ -16,6 +16,7 @@ pub enum View {
     GoogleAuth,
     PlannerInbox,
     PlannerTaskForm,
+    PlannerSettingsForm,
 }
 
 /* Every user-facing action the app can take. */
@@ -84,6 +85,7 @@ pub enum Action {
     CreateTask,
     PlannerOptimize,
     PlannerApply,
+    PlannerSettings,
 
     // ── Scroll (help, agenda) ────────────────────────────────────
     ScrollUp,
@@ -124,6 +126,7 @@ pub fn resolve(view: &View, key: KeyEvent) -> Action {
         View::GoogleAuth => resolve_google_auth(key),
         View::PlannerInbox => resolve_planner_inbox(key),
         View::PlannerTaskForm => resolve_event_form(key),
+        View::PlannerSettingsForm => resolve_event_form(key),
     }
 }
 
@@ -324,6 +327,7 @@ fn resolve_planner_inbox(key: KeyEvent) -> Action {
         Char('n') => Action::CreateTask,
         Char('o') => Action::PlannerOptimize,
         Char('a') => Action::PlannerApply,
+        Char('s') => Action::PlannerSettings,
         Char('j') | Down => Action::NextUnit,
         Char('k') | Up => Action::PrevUnit,
         _ => Action::None,
@@ -394,8 +398,12 @@ pub fn hints(view: &View) -> Vec<Hint> {
             ("n", "new task"),
             ("o", "optimize"),
             ("a", "apply"),
+            ("s", "settings"),
             ("Esc", "close"),
         ],
         View::PlannerTaskForm => vec![("Tab/↑↓", "field"), ("Enter", "save"), ("Esc", "cancel")],
+        View::PlannerSettingsForm => {
+            vec![("Tab/↑↓", "field"), ("Enter", "save"), ("Esc", "cancel")]
+        }
     }
 }

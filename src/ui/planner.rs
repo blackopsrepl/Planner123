@@ -77,7 +77,7 @@ pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
             text
         }
         None => vec![Line::from(
-            "No proposal yet. Configure Planner Settings through the CLI, then press o.",
+            "No proposal yet. Press s to configure Planner Settings, then press o.",
         )],
     };
     frame.render_widget(
@@ -87,6 +87,45 @@ pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
                 .title(" SolverForge Proposal "),
         ),
         proposal_area,
+    );
+}
+
+pub fn render_settings_form(app: &App, frame: &mut Frame) {
+    let area = centered_rect(82, 58, frame.area());
+    frame.render_widget(Clear, area);
+    let rows = [
+        format!("Timezone: {}", app.planner_settings_timezone),
+        format!("Weekly availability: {}", app.planner_settings_availability),
+        format!("Horizon days: {}", app.planner_settings_horizon_days),
+        format!("Slot minutes: {}", app.planner_settings_slot_minutes),
+        format!("Solve seconds: {}", app.planner_settings_solve_seconds),
+    ];
+    let lines = rows
+        .into_iter()
+        .enumerate()
+        .map(|(index, row)| {
+            let prefix = if index == app.planner_settings_field {
+                "> "
+            } else {
+                "  "
+            };
+            Line::from(Span::styled(
+                format!("{prefix}{row}"),
+                if index == app.planner_settings_field {
+                    theme::theme().selected()
+                } else {
+                    Style::default()
+                },
+            ))
+        })
+        .collect::<Vec<_>>();
+    frame.render_widget(
+        Paragraph::new(lines).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Planner Settings — availability: mon=09:00-17:00, tue=09:00-17:00 "),
+        ),
+        area,
     );
 }
 
