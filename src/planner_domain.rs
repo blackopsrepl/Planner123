@@ -24,6 +24,7 @@ pub struct SolverTask {
     pub excess_high_penalty: i64,
     pub feasible: Vec<bool>,
     pub cognitive: Vec<i64>,
+    pub external_fatigue: Vec<i64>,
     #[planning_variable(value_range_provider = "slots", allows_unassigned = true)]
     pub start_slot_idx: Option<usize>,
 }
@@ -63,6 +64,12 @@ impl SolverTask {
                 .max(0),
             _ => 0,
         }
+    }
+    pub fn external_fatigue_cost(&self) -> i64 {
+        self.start_slot_idx
+            .and_then(|idx| self.external_fatigue.get(idx))
+            .copied()
+            .unwrap_or(0)
     }
     fn high_load_streak_with(&self, other: &Self) -> bool {
         if !self.high || !other.high {
@@ -157,6 +164,11 @@ fn planner_constraints() -> impl ConstraintSet<SolverPlan, HardMediumSoftScore> 
             HardMediumSoftScore::of(0, 0, left.excess_high_penalty)
         })
         .named("High cognitive-load recovery");
+    let applied_fatigue = ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
+        .for_each(SolverPlan::tasks())
+        .filter(|task: &SolverTask| task.external_fatigue_cost() > 0)
+        .penalize(|task: &SolverTask| HardMediumSoftScore::of(0, 0, task.external_fatigue_cost()))
+        .named("Applied high cognitive-load recovery");
     (
         unassigned,
         invalid,
@@ -165,6 +177,7 @@ fn planner_constraints() -> impl ConstraintSet<SolverPlan, HardMediumSoftScore> 
         soft_deadline,
         cognitive,
         fatigue,
+        applied_fatigue,
     )
 }
 

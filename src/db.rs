@@ -7,6 +7,7 @@ const MIGRATION_V1: &str = "20260101000001";
 const MIGRATION_V2: &str = "20260406000001";
 const MIGRATION_V3: &str = "20260412000001";
 const MIGRATION_V4: &str = "20260830000001";
+const MIGRATION_V5: &str = "20260831000001";
 
 /* Path to the calendar database. */
 pub fn db_path() -> PathBuf {
@@ -71,6 +72,11 @@ fn migrate(conn: &Connection) -> Result<()> {
     if !migration_applied(conn, MIGRATION_V4)? {
         migrate_v4(conn)?;
         record_migration(conn, MIGRATION_V4)?;
+    }
+
+    if !migration_applied(conn, MIGRATION_V5)? {
+        migrate_v5(conn)?;
+        record_migration(conn, MIGRATION_V5)?;
     }
 
     Ok(())
@@ -366,6 +372,25 @@ fn migrate_v4(conn: &Connection) -> Result<()> {
             proposal_id TEXT NOT NULL REFERENCES planner_proposals(id),
             created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now'))
         );
+        ",
+    )?;
+    Ok(())
+}
+
+fn migrate_v5(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TRIGGER IF NOT EXISTS planner_task_event_soft_deleted
+        AFTER UPDATE OF deleted_at ON events
+        WHEN OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
+        BEGIN
+            UPDATE planning_tasks
+            SET state = 'missing_event', updated_at = NEW.updated_at
+            WHERE id IN (
+                SELECT task_id FROM planning_task_events WHERE event_id = NEW.id
+            )
+              AND state = 'applied';
+        END;
         ",
     )?;
     Ok(())

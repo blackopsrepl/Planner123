@@ -409,6 +409,7 @@ pub fn optimize(
     let slots = make_slots(local_start, settings.horizon_days, settings.slot_minutes)?;
     let busy = busy_intervals(conn)?;
     let dependency_map = dependency_map(conn, &tasks)?;
+    let applied_predecessor_ends = applied_predecessor_ends(conn, &tasks, &timezone_name)?;
     let applied_high = applied_high_intervals(conn)?;
     let mut assignments = Vec::new();
     for (id, task) in tasks.iter().enumerate() {
@@ -428,6 +429,7 @@ pub fn optimize(
             .map_err(validation)?;
         let mut feasible = Vec::with_capacity(slots.len());
         let mut cognitive = Vec::with_capacity(slots.len());
+        let mut external_fatigue = Vec::with_capacity(slots.len());
         for slot in &slots {
             let end = slot.start + Duration::minutes(task.duration_minutes);
             let allowed = available_interval(slot.start, end, &availability, timezone)
@@ -435,6 +437,10 @@ pub fn optimize(
                     .iter()
                     .any(|(start, finish)| overlaps(slot.start, end, *start, *finish))
                 && earliest.map(|value| slot.start >= value).unwrap_or(true)
+                && applied_predecessor_ends
+                    .get(&task.id)
+                    .map(|value| slot.start >= *value)
+                    .unwrap_or(true)
                 && (task.deadline_kind != DeadlineKind::Hard
                     || deadline.map(|value| end <= value).unwrap_or(false));
             feasible.push(allowed);
@@ -450,6 +456,12 @@ pub fn optimize(
             } else {
                 0
             });
+            external_fatigue.push(applied_fatigue_cost(
+                task.cognitive_load == CognitiveLoad::High,
+                slot.start,
+                &applied_high,
+                &settings,
+            ));
         }
         assignments.push(SolverTask {
             id,
@@ -472,6 +484,7 @@ pub fn optimize(
             excess_high_penalty: settings.excess_high_penalty,
             feasible,
             cognitive,
+            external_fatigue,
             start_slot_idx: None,
         });
     }
@@ -539,8 +552,7 @@ pub fn optimize(
         } else {
             (None, None, 0)
         };
-        let fatigue_penalty =
-            fatigue_penalty(assignment, &solved.tasks, &slots, &settings, &applied_high);
+        let fatigue_penalty = fatigue_penalty(assignment, &solved.tasks, &slots, &settings);
         let explanation = if selected.is_none() {
             Some("No feasible slot within the configured horizon.".into())
         } else if fatigue_penalty > 0 {
@@ -587,15 +599,17 @@ pub fn proposal(conn: &Connection, id: &str) -> Result<ProposalDetail, PlannerEr
 }
 
 pub fn apply_proposal(conn: &Connection, id: &str) -> Result<ProposalDetail, PlannerError> {
-    let detail = proposal(conn, id)?;
+    let tx = conn.unchecked_transaction().map_err(internal)?;
+    let detail = proposal(&tx, id)?;
     if detail.proposal.status != "ready" {
         return Err(PlannerError::Conflict(
             "proposal is not ready to apply".into(),
         ));
     }
-    validate_snapshot(conn, id)?;
+    validate_snapshot(&tx, id)?;
+    let mut application = Vec::new();
     for item in detail.items.iter().filter(|item| item.scheduled) {
-        let task = require_task(conn, &item.task_id)?;
+        let task = require_task(&tx, &item.task_id)?;
         if task.state != PlanningTaskState::Inbox {
             return Err(PlannerError::Conflict(format!(
                 "task '{}' is no longer in the inbox",
@@ -616,29 +630,35 @@ pub fn apply_proposal(conn: &Connection, id: &str) -> Result<ProposalDetail, Pla
             detail.proposal.timezone.clone(),
         );
         event.project_id = task.project_id.clone();
-        let saved = event_service::save_event(conn, event, true).map_err(event_service_error)?;
-        conn.execute(
+        application.push((item, task, event));
+    }
+    for (_item, task, event) in application {
+        let saved = event_service::save_event_in_transaction(&tx, event, true)
+            .map_err(event_service_error)?;
+        tx.execute(
             "INSERT INTO planning_task_events (task_id,event_id,proposal_id) VALUES (?1,?2,?3)",
             params![task.id, saved.id, id],
         )
         .map_err(internal)?;
-        conn.execute(
+        tx.execute(
             "UPDATE planning_tasks SET state='applied',updated_at=?2 WHERE id=?1",
             params![task.id, now()],
         )
         .map_err(internal)?;
     }
-    conn.execute(
+    tx.execute(
         "UPDATE planner_proposals SET status='applied',applied_at=?2 WHERE id=?1",
         params![id, now()],
     )
     .map_err(internal)?;
+    tx.commit().map_err(internal)?;
     proposal(conn, id)
 }
 
 pub fn return_to_inbox(conn: &Connection, task_id: &str) -> Result<PlanningTask, PlannerError> {
-    let task = require_task(conn, task_id)?;
-    let event_id: Option<String> = conn
+    let tx = conn.unchecked_transaction().map_err(internal)?;
+    let task = require_task(&tx, task_id)?;
+    let event_id: Option<String> = tx
         .query_row(
             "SELECT event_id FROM planning_task_events WHERE task_id=?1",
             [task_id],
@@ -647,18 +667,22 @@ pub fn return_to_inbox(conn: &Connection, task_id: &str) -> Result<PlanningTask,
         .optional()
         .map_err(internal)?;
     if let Some(event_id) = event_id {
-        event_service::delete_event(conn, &event_id).map_err(event_service_error)?;
-        conn.execute(
+        if db::get_event(&tx, &event_id).map_err(internal)?.is_some() {
+            event_service::delete_event_in_transaction(&tx, &event_id)
+                .map_err(event_service_error)?;
+        }
+        tx.execute(
             "DELETE FROM planning_task_events WHERE task_id=?1",
             [task_id],
         )
         .map_err(internal)?;
     }
-    conn.execute(
+    tx.execute(
         "UPDATE planning_tasks SET state='inbox',updated_at=?2 WHERE id=?1",
         params![task_id, now()],
     )
     .map_err(internal)?;
+    tx.commit().map_err(internal)?;
     require_task(conn, &task.id)
 }
 
@@ -1071,6 +1095,43 @@ fn dependency_map(
     }
     Ok(out)
 }
+
+fn applied_predecessor_ends(
+    conn: &Connection,
+    inbox_tasks: &[PlanningTask],
+    timezone: &str,
+) -> Result<HashMap<String, DateTime<Utc>>, PlannerError> {
+    let inbox: std::collections::HashSet<_> =
+        inbox_tasks.iter().map(|task| task.id.as_str()).collect();
+    let mut ends: HashMap<String, DateTime<Utc>> = HashMap::new();
+    for (from, to) in list_dependencies(conn)? {
+        if !inbox.contains(to.as_str()) || inbox.contains(from.as_str()) {
+            continue;
+        }
+        let predecessor = require_task(conn, &from)?;
+        let event: Option<(String, String)> = conn
+            .query_row(
+                "SELECT e.end_at,e.timezone FROM planning_task_events l JOIN events e ON e.id=l.event_id WHERE l.task_id=?1 AND e.deleted_at IS NULL",
+                [&from],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(internal)?;
+        let Some((end, event_timezone)) = event else {
+            return Err(PlannerError::Conflict(format!(
+                "dependency predecessor '{}' is not backed by an active event",
+                predecessor.title
+            )));
+        };
+        let end = time::resolve_utc_datetime(&end, &event_timezone)
+            .or_else(|_| time::resolve_utc_datetime(&end, timezone))
+            .map_err(validation)?;
+        ends.entry(to)
+            .and_modify(|current| *current = (*current).max(end))
+            .or_insert(end);
+    }
+    Ok(ends)
+}
 fn make_slots(start: DateTime<Tz>, days: i64, minutes: i64) -> Result<Vec<Slot>, PlannerError> {
     let count = days
         .checked_mul(24)
@@ -1191,7 +1252,6 @@ fn fatigue_penalty(
     all: &[SolverTask],
     slots: &[Slot],
     settings: &PlannerSettings,
-    applied: &[(DateTime<Utc>, DateTime<Utc>)],
 ) -> i64 {
     if !task.high {
         return 0;
@@ -1203,12 +1263,7 @@ fn fatigue_penalty(
         return 0;
     };
     let start = slot.start;
-    let mut preceding = applied
-        .iter()
-        .filter(|(_, end)| {
-            *end <= start && (start - *end).num_minutes() < settings.recovery_minutes
-        })
-        .count();
+    let mut current_preceding = 0;
     for other in all {
         if other.id == task.id || !other.high {
             continue;
@@ -1216,10 +1271,33 @@ fn fatigue_penalty(
         if let Some(end) = other.end() {
             let end = slots[0].start + Duration::minutes(end);
             if end <= start && (start - end).num_minutes() < settings.recovery_minutes {
-                preceding += 1;
+                current_preceding += 1;
             }
         }
     }
+    if task.external_fatigue_cost() > 0 || current_preceding >= settings.high_streak_limit as usize
+    {
+        settings.excess_high_penalty
+    } else {
+        0
+    }
+}
+
+fn applied_fatigue_cost(
+    high: bool,
+    start: DateTime<Utc>,
+    applied: &[UtcInterval],
+    settings: &PlannerSettings,
+) -> i64 {
+    if !high {
+        return 0;
+    }
+    let preceding = applied
+        .iter()
+        .filter(|(_, end)| {
+            *end <= start && (start - *end).num_minutes() < settings.recovery_minutes
+        })
+        .count();
     if preceding >= settings.high_streak_limit as usize {
         settings.excess_high_penalty
     } else {
@@ -1315,5 +1393,58 @@ mod tests {
         let second = create_task(&conn, task(calendar_id, "Second")).unwrap();
         add_dependency(&conn, &first.id, &second.id).unwrap();
         assert!(add_dependency(&conn, &second.id, &first.id).is_err());
+    }
+
+    #[test]
+    fn deleted_linked_event_moves_task_to_missing_event_and_can_return_to_inbox() {
+        let (_temp, conn, calendar_id) = connection();
+        let created = create_task(&conn, task(calendar_id.clone(), "Recover me")).unwrap();
+        let event = event_service::save_event(
+            &conn,
+            Event::new(
+                calendar_id,
+                "Recover me",
+                "2026-09-01 09:00:00",
+                "2026-09-01 10:00:00",
+                "UTC",
+            ),
+            true,
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO planner_proposals (id,status,horizon_start,horizon_days,timezone,snapshot_json,created_at) VALUES ('proposal','applied','2026-09-01 00:00:00',1,'UTC','{}','2026-09-01 00:00:00')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO planning_task_events (task_id,event_id,proposal_id) VALUES (?1,?2,'proposal')",
+            params![created.id, event.id],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE planning_tasks SET state='applied' WHERE id=?1",
+            [&created.id],
+        )
+        .unwrap();
+
+        event_service::delete_event(&conn, &event.id).unwrap();
+        assert_eq!(
+            require_task(&conn, &created.id).unwrap().state,
+            PlanningTaskState::MissingEvent
+        );
+
+        assert_eq!(
+            return_to_inbox(&conn, &created.id).unwrap().state,
+            PlanningTaskState::Inbox
+        );
+        assert!(
+            conn.query_row::<i64, _, _>(
+                "SELECT COUNT(*) FROM planning_task_events WHERE task_id=?1",
+                [&created.id],
+                |row| row.get(0),
+            )
+            .unwrap()
+                == 0
+        );
     }
 }
