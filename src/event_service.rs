@@ -150,7 +150,7 @@ fn prepare_event(
     event.title = event.title.trim().to_string();
     event.description = normalize_optional(event.description.take());
     event.location = normalize_optional(event.location.take());
-    event.rrule = normalize_optional(event.rrule.take());
+    event.rrule = normalize_rrule(normalize_optional(event.rrule.take()))?;
     event.timezone = time::normalize_timezone(event.timezone.trim()).map_err(map_validation)?;
 
     if event.all_day {
@@ -182,6 +182,26 @@ fn prepare_event(
     event.updated_at = now;
 
     Ok(calendar)
+}
+
+fn normalize_rrule(value: Option<String>) -> Result<Option<String>, EventServiceError> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+
+    if value.starts_with("RRULE:") {
+        return Err(EventServiceError::Validation(
+            "rrule must contain rule content beginning with FREQ=, not an RRULE: property prefix"
+                .to_string(),
+        ));
+    }
+    if !value.starts_with("FREQ=") {
+        return Err(EventServiceError::Validation(
+            "rrule must contain rule content beginning with FREQ=".to_string(),
+        ));
+    }
+
+    Ok(Some(value))
 }
 
 fn ensure_event_exists(conn: &Connection, event_id: &str) -> Result<(), EventServiceError> {
@@ -281,6 +301,25 @@ mod tests {
         let saved = save_event(&conn, event, true).unwrap();
         assert_eq!(saved.start_at, "2026-04-12 00:00:00");
         assert_eq!(saved.end_at, "2026-04-12 23:59:59");
+    }
+
+    #[test]
+    fn save_event_requires_unprefixed_rrule_content() {
+        let (_temp, conn) = open_test_db();
+        let calendar_id = first_calendar_id(&conn);
+        let mut event = Event::new(
+            calendar_id,
+            "Planning",
+            "2026-04-12 09:00:00",
+            "2026-04-12 10:00:00",
+            "UTC",
+        );
+        event.rrule = Some("RRULE:FREQ=WEEKLY".to_string());
+
+        let err = save_event(&conn, event, true).unwrap_err();
+        assert!(
+            matches!(err, EventServiceError::Validation(message) if message.contains("RRULE:"))
+        );
     }
 
     #[test]

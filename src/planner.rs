@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use chrono::{DateTime, Datelike, Duration, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Days, Duration, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
@@ -406,7 +406,12 @@ pub fn optimize(
         .ok_or_else(|| {
             PlannerError::Validation("planner horizon starts at an invalid local time".into())
         })?;
-    let slots = make_slots(local_start, settings.horizon_days, settings.slot_minutes)?;
+    let horizon_end = local_horizon_end(local_start, settings.horizon_days)?;
+    let slots = make_slots(
+        local_start.with_timezone(&Utc),
+        horizon_end,
+        settings.slot_minutes,
+    )?;
     let busy = busy_intervals(conn)?;
     let dependency_map = dependency_map(conn, &tasks)?;
     let applied_predecessor_ends = applied_predecessor_ends(conn, &tasks, &timezone_name)?;
@@ -433,6 +438,7 @@ pub fn optimize(
         for slot in &slots {
             let end = slot.start + Duration::minutes(task.duration_minutes);
             let allowed = available_interval(slot.start, end, &availability, timezone)
+                && end <= horizon_end
                 && !busy
                     .iter()
                     .any(|(start, finish)| overlaps(slot.start, end, *start, *finish))
@@ -1132,17 +1138,38 @@ fn applied_predecessor_ends(
     }
     Ok(ends)
 }
-fn make_slots(start: DateTime<Tz>, days: i64, minutes: i64) -> Result<Vec<Slot>, PlannerError> {
-    let count = days
-        .checked_mul(24)
-        .and_then(|v| v.checked_mul(60))
-        .and_then(|v| v.checked_div(minutes))
+fn local_horizon_end(start: DateTime<Tz>, days: i64) -> Result<DateTime<Utc>, PlannerError> {
+    let days =
+        u64::try_from(days).map_err(|_| PlannerError::Validation("invalid horizon".into()))?;
+    let end_date = start
+        .date_naive()
+        .checked_add_days(Days::new(days))
         .ok_or_else(|| PlannerError::Validation("invalid horizon".into()))?;
-    Ok((0..count)
-        .map(|idx| Slot {
-            start: start.with_timezone(&Utc) + Duration::minutes(idx * minutes),
+    start
+        .timezone()
+        .from_local_datetime(&end_date.and_hms_opt(0, 0, 0).unwrap())
+        .single()
+        .map(|end| end.with_timezone(&Utc))
+        .ok_or_else(|| {
+            PlannerError::Validation("planner horizon ends at an invalid local time".into())
         })
-        .collect())
+}
+
+fn make_slots(
+    start: DateTime<Utc>,
+    end: DateTime<Utc>,
+    minutes: i64,
+) -> Result<Vec<Slot>, PlannerError> {
+    if minutes <= 0 || end <= start {
+        return Err(PlannerError::Validation("invalid horizon".into()));
+    }
+    let mut slots = Vec::new();
+    let mut slot_start = start;
+    while slot_start < end {
+        slots.push(Slot { start: slot_start });
+        slot_start += Duration::minutes(minutes);
+    }
+    Ok(slots)
 }
 struct Slot {
     start: DateTime<Utc>,
@@ -1336,6 +1363,7 @@ fn validate_snapshot(conn: &Connection, id: &str) -> Result<(), PlannerError> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Timelike;
     use tempfile::TempDir;
 
     use super::*;
@@ -1384,6 +1412,31 @@ mod tests {
         assert_eq!(created.cognitive_load, CognitiveLoad::High);
         assert_eq!(created.state, PlanningTaskState::Inbox);
         assert_eq!(list_tasks(&conn).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn local_day_horizons_include_every_dst_instant_and_no_more() {
+        let timezone = Tz::from_str("Europe/Rome").unwrap();
+        for (date, hours) in [("2026-03-29", 23), ("2026-10-25", 25)] {
+            let start = timezone
+                .from_local_datetime(
+                    &chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+                        .unwrap()
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap(),
+                )
+                .single()
+                .unwrap();
+            let end = local_horizon_end(start, 1).unwrap();
+            let slots = make_slots(start.with_timezone(&Utc), end, 60).unwrap();
+
+            assert_eq!(slots.len(), hours);
+            assert_eq!(
+                (slots.last().unwrap().start + Duration::hours(1)).with_timezone(&timezone),
+                end.with_timezone(&timezone)
+            );
+            assert_eq!(end.with_timezone(&timezone).hour(), 0);
+        }
     }
 
     #[test]

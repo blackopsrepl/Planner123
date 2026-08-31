@@ -577,6 +577,10 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].timezone, "Europe/Rome");
         assert_eq!(events[0].rrule.as_deref(), Some("FREQ=WEEKLY;COUNT=2"));
+        assert_eq!(
+            crate::google::types::local_event_insert_body(&events[0]).unwrap()["recurrence"],
+            serde_json::json!(["RRULE:FREQ=WEEKLY;COUNT=2"])
+        );
         assert!(events[1].all_day);
         assert_eq!(events[1].start_at, "2026-04-20 00:00:00");
         assert_eq!(events[1].end_at, "2026-04-21 23:59:59");

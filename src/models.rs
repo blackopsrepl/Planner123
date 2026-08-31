@@ -64,7 +64,7 @@ pub struct Event {
     pub start_at: String, // ISO 8601 datetime
     pub end_at: String,
     pub all_day: bool,
-    pub rrule: Option<String>, // RFC 5545 RRULE string
+    pub rrule: Option<String>, // RFC 5545 RRULE property value, beginning with FREQ=
     pub google_id: Option<String>,
     pub google_etag: Option<String>,
     pub reminder_minutes: Option<i64>,

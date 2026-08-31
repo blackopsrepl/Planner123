@@ -8,6 +8,7 @@ const MIGRATION_V2: &str = "20260406000001";
 const MIGRATION_V3: &str = "20260412000001";
 const MIGRATION_V4: &str = "20260830000001";
 const MIGRATION_V5: &str = "20260831000001";
+const MIGRATION_V6: &str = "20260831000002";
 
 /* Path to the calendar database. */
 pub fn db_path() -> PathBuf {
@@ -77,6 +78,11 @@ fn migrate(conn: &Connection) -> Result<()> {
     if !migration_applied(conn, MIGRATION_V5)? {
         migrate_v5(conn)?;
         record_migration(conn, MIGRATION_V5)?;
+    }
+
+    if !migration_applied(conn, MIGRATION_V6)? {
+        migrate_v6(conn)?;
+        record_migration(conn, MIGRATION_V6)?;
     }
 
     Ok(())
@@ -392,6 +398,14 @@ fn migrate_v5(conn: &Connection) -> Result<()> {
               AND state = 'applied';
         END;
         ",
+    )?;
+    Ok(())
+}
+
+fn migrate_v6(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "UPDATE events SET rrule = substr(rrule, 7) WHERE rrule LIKE 'RRULE:%'",
+        [],
     )?;
     Ok(())
 }
@@ -1126,6 +1140,38 @@ mod tests {
         let calendars = load_calendars(&reopened).unwrap();
         assert_eq!(calendars.len(), 1);
         assert_eq!(calendars[0].name, "Personal");
+    }
+
+    #[test]
+    fn open_at_migrates_prefixed_rrules_to_canonical_content() {
+        let temp = TempDir::new().unwrap();
+        let db_path = temp.path().join("calendar.db");
+
+        {
+            let conn = open_at(&db_path).unwrap();
+            let calendar_id = load_calendars(&conn).unwrap()[0].id.clone();
+            let mut event = Event::new(
+                calendar_id,
+                "Planning",
+                "2026-04-12 09:00:00",
+                "2026-04-12 10:00:00",
+                "UTC",
+            );
+            event.rrule = Some("RRULE:FREQ=WEEKLY".to_string());
+            insert_event(&conn, &event).unwrap();
+            conn.execute(
+                "DELETE FROM schema_migrations WHERE version = ?1",
+                [MIGRATION_V6],
+            )
+            .unwrap();
+        }
+
+        let reopened = open_at(&db_path).unwrap();
+        assert_eq!(
+            load_events(&reopened).unwrap()[0].rrule.as_deref(),
+            Some("FREQ=WEEKLY")
+        );
+        assert!(migration_applied(&reopened, MIGRATION_V6).unwrap());
     }
 
     #[test]

@@ -73,8 +73,7 @@ pub fn google_event_to_local(calendar_id: &str, event: &GoogleEvent) -> Result<E
         rrule: event.recurrence.as_ref().and_then(|rules| {
             rules
                 .iter()
-                .find(|rule| rule.starts_with("RRULE:"))
-                .cloned()
+                .find_map(|rule| rule.strip_prefix("RRULE:").map(str::to_string))
         }),
         google_id: Some(google_id),
         google_etag: event.etag.clone(),
@@ -115,7 +114,7 @@ pub fn local_event_insert_body(event: &Event) -> Result<serde_json::Value> {
         "location": event.location,
         "start": local_event_time_body(event, true)?,
         "end": local_event_time_body(event, false)?,
-        "recurrence": event.rrule.as_ref().map(|rule| vec![rule.clone()]),
+        "recurrence": event.rrule.as_ref().map(|rule| vec![format!("RRULE:{rule}")]),
     }))
 }
 
@@ -201,7 +200,8 @@ fn map_google_time(
 #[cfg(test)]
 mod tests {
     use super::{
-        google_event_to_local, is_recurring_exception, local_event_insert_body, GoogleEvent,
+        google_event_to_local, is_recurring_exception, local_event_insert_body,
+        local_event_patch_body, GoogleEvent,
     };
     use crate::models::Event;
 
@@ -256,5 +256,45 @@ mod tests {
         let body = local_event_insert_body(&event).unwrap();
         assert_eq!(body["start"]["date"], "2026-04-12");
         assert_eq!(body["end"]["date"], "2026-04-13");
+    }
+
+    #[test]
+    fn translates_canonical_rrule_content_for_google_create_and_update() {
+        let mut event = Event::new(
+            "calendar-1",
+            "Planning",
+            "2026-04-12 09:00:00",
+            "2026-04-12 10:00:00",
+            "UTC",
+        );
+        event.rrule = Some("FREQ=WEEKLY;COUNT=2".to_string());
+
+        assert_eq!(
+            local_event_insert_body(&event).unwrap()["recurrence"],
+            serde_json::json!(["RRULE:FREQ=WEEKLY;COUNT=2"])
+        );
+        assert_eq!(
+            local_event_patch_body(&event).unwrap()["recurrence"],
+            serde_json::json!(["RRULE:FREQ=WEEKLY;COUNT=2"])
+        );
+    }
+
+    #[test]
+    fn imports_google_rrule_as_canonical_rule_content() {
+        let event = serde_json::from_value::<GoogleEvent>(serde_json::json!({
+            "id": "abc",
+            "start": { "dateTime": "2026-04-12T09:00:00Z" },
+            "end": { "dateTime": "2026-04-12T10:00:00Z" },
+            "recurrence": ["RRULE:FREQ=WEEKLY;COUNT=2"]
+        }))
+        .unwrap();
+
+        assert_eq!(
+            google_event_to_local("calendar-1", &event)
+                .unwrap()
+                .rrule
+                .as_deref(),
+            Some("FREQ=WEEKLY;COUNT=2")
+        );
     }
 }
