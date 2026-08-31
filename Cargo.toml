@@ -1,6 +1,6 @@
 [package]
 name = "solverforge-calendar"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.95"
 description = "A spiffy ratatui TUI calendar — local SQLite + Google Calendar, DAG-linked events"

@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. See [commit
 
 ## Unreleased
 
+- make Planner Inbox availability configuration accessible from the Ratatui TUI
+- replace raw planner availability JSON CLI input with typed weekly windows
+- persist proposal blocker evidence and invalidate proposals after settings or dependency changes
+
 ### Features
 
 - compliant desktop Google OAuth, calendar discovery/import, and writable vs read-only calendar handling

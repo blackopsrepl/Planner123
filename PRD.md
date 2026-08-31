@@ -839,3 +839,7 @@ The implementation must follow current official Google documentation, especially
 The calendar includes an explicit Planner Inbox for unscheduled, contiguous tasks. A batch solve creates a persistent review proposal and only explicit apply creates events. Existing event creation, quick-add, and explicit Google synchronization remain unchanged.
 
 The planner treats all active calendars as busy time, requires successful explicit Google sync state for active Google calendars, and uses configured weekly availability as a hard boundary. Priority, soft deadlines, cognitive preferred windows, and high-cognitive recovery streaks are optimization preferences; hard deadlines and dependencies remain hard constraints.
+
+## v0.4.0 planner interface contract
+
+Planner optimization is user-facing in both supported entrypoints. The Ratatui Planner Inbox configures timezone and weekly availability directly, while the JSON CLI accepts repeatable typed `--availability DAY=HH:MM-HH:MM` values; neither interface exposes persistence JSON. Proposal review reports bounded calendar-event blocker evidence, including recurring occurrences. A proposal is inapplicable after its planner settings or dependency graph changes, and explicit apply revalidates that state transactionally.

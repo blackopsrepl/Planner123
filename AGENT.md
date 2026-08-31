@@ -36,8 +36,8 @@ Direct cargo commands used in CI:
 - `src/ical.rs`: `.ics` import/export
 - `src/google/`: OAuth, calendar discovery, typed event API, and Google payload mapping
 - `src/sync/`: sync engine, pull, push, conflicts, and persisted sync state helpers
-- `src/db.rs`: SQLite schema, migrations, CRUD helpers, and sync metadata tables
-- `tests/cli.rs`: binary-level CLI integration tests
+- `src/db.rs`: SQLite schema, migrations, CRUD helpers, sync metadata tables, and planner proposal evidence
+- `tests/cli.rs`: binary-level CLI integration tests, including the JSON-first planner contract
 - `docs/wireframes/`: ASCII references for the CLI and TUI surfaces
 
 ## Constraints
