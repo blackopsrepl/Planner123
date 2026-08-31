@@ -14,7 +14,7 @@ pub enum WorkerResult {
         events: Vec<Event>,
     },
     DependenciesLoaded(Vec<EventDependency>),
-    EventSaved(Box<Event>),
+    EventSaved(Event),
     EventDeleted(String),
     GoogleAuthComplete(Arc<crate::google::auth::GoogleClient>),
     GoogleCalendarsDiscovered(Vec<crate::google::discovery::DiscoveredGoogleCalendar>),
@@ -252,7 +252,7 @@ impl Worker {
             })();
             match result {
                 Ok(ev) => {
-                    let _ = tx.send(WorkerResult::EventSaved(Box::new(ev)));
+                    let _ = tx.send(WorkerResult::EventSaved(ev));
                 }
                 Err(e) => {
                     let _ = tx.send(WorkerResult::Error(e.to_string()));

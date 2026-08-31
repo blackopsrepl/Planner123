@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     str::FromStr,
 };
 
@@ -14,8 +14,9 @@ use uuid::Uuid;
 use crate::{
     db, event_service,
     models::{
-        CalendarSource, CognitiveLoad, DeadlineKind, Event, PlannerProposal, PlannerProposalItem,
-        PlannerSettings, PlanningTask, PlanningTaskState, TaskPriority,
+        CalendarSource, CognitiveLoad, DeadlineKind, Event, PlannerBusyBlocker, PlannerProposal,
+        PlannerProposalDiagnostics, PlannerProposalItem, PlannerProposalOutcome, PlannerSettings,
+        PlanningTask, PlanningTaskState, TaskPriority,
     },
     planner_domain::{SolverPlan, SolverSlot, SolverTask, PLANNER_MANAGER},
     sync::state,
@@ -107,12 +108,32 @@ pub struct SettingsUpdate {
 pub struct ProposalDetail {
     pub proposal: PlannerProposal,
     pub items: Vec<PlannerProposalItem>,
+    pub applicability: ProposalApplicability,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ProposalSnapshot {
     task_versions: HashMap<String, String>,
     event_versions: HashMap<String, String>,
+    #[serde(default)]
+    settings_json: Option<String>,
+    #[serde(default)]
+    dependencies: Option<Vec<(String, String)>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProposalApplicability {
+    pub can_apply: bool,
+    pub reasons: Vec<String>,
+}
+
+impl ProposalApplicability {
+    fn ready() -> Self {
+        Self {
+            can_apply: true,
+            reasons: Vec::new(),
+        }
+    }
 }
 
 pub fn settings(conn: &Connection) -> Result<PlannerSettings, PlannerError> {
@@ -128,6 +149,25 @@ pub fn settings(conn: &Connection) -> Result<PlannerSettings, PlannerError> {
         settings_from_row,
     )
     .map_err(internal)
+}
+
+/* Render planner settings without leaking SQLite's JSON storage representation. */
+pub fn settings_json(conn: &Connection) -> Result<serde_json::Value, PlannerError> {
+    let settings = settings(conn)?;
+    let availability: Availability =
+        serde_json::from_str(&settings.availability_json).map_err(|error| {
+            PlannerError::Validation(format!("invalid planner availability: {error}"))
+        })?;
+    let mut value = serde_json::to_value(settings).map_err(internal)?;
+    let object = value.as_object_mut().ok_or_else(|| {
+        PlannerError::Internal("planner settings did not serialize as an object".into())
+    })?;
+    object.remove("availability_json");
+    object.insert(
+        "availability".into(),
+        serde_json::to_value(availability).map_err(internal)?,
+    );
+    Ok(value)
 }
 
 pub fn update_settings(
@@ -417,6 +457,7 @@ pub fn optimize(
     let applied_predecessor_ends = applied_predecessor_ends(conn, &tasks, &timezone_name)?;
     let applied_high = applied_high_intervals(conn)?;
     let mut assignments = Vec::new();
+    let mut busy_evidence = Vec::new();
     for (id, task) in tasks.iter().enumerate() {
         let (window_start, window_end, outside_penalty) =
             cognitive_profile(&settings, &task.cognitive_load);
@@ -435,20 +476,29 @@ pub fn optimize(
         let mut feasible = Vec::with_capacity(slots.len());
         let mut cognitive = Vec::with_capacity(slots.len());
         let mut external_fatigue = Vec::with_capacity(slots.len());
+        let mut task_busy_evidence = BTreeSet::new();
         for slot in &slots {
             let end = slot.start + Duration::minutes(task.duration_minutes);
-            let allowed = available_interval(slot.start, end, &availability, timezone)
-                && end <= horizon_end
-                && !busy
-                    .iter()
-                    .any(|(start, finish)| overlaps(slot.start, end, *start, *finish))
-                && earliest.map(|value| slot.start >= value).unwrap_or(true)
-                && applied_predecessor_ends
-                    .get(&task.id)
-                    .map(|value| slot.start >= *value)
-                    .unwrap_or(true)
-                && (task.deadline_kind != DeadlineKind::Hard
-                    || deadline.map(|value| end <= value).unwrap_or(false));
+            let hard_feasible_without_busy =
+                available_interval(slot.start, end, &availability, timezone)
+                    && end <= horizon_end
+                    && earliest.map(|value| slot.start >= value).unwrap_or(true)
+                    && applied_predecessor_ends
+                        .get(&task.id)
+                        .map(|value| slot.start >= *value)
+                        .unwrap_or(true)
+                    && (task.deadline_kind != DeadlineKind::Hard
+                        || deadline.map(|value| end <= value).unwrap_or(false));
+            let mut has_overlapping_busy_time = false;
+            for (index, occurrence) in busy.iter().enumerate() {
+                if overlaps(slot.start, end, occurrence.start, occurrence.end) {
+                    has_overlapping_busy_time = true;
+                    if hard_feasible_without_busy {
+                        task_busy_evidence.insert(index);
+                    }
+                }
+            }
+            let allowed = hard_feasible_without_busy && !has_overlapping_busy_time;
             feasible.push(allowed);
             cognitive.push(if settings.cognitive_enabled {
                 cognitive_cost(
@@ -493,6 +543,7 @@ pub fn optimize(
             external_fatigue,
             start_slot_idx: None,
         });
+        busy_evidence.push(task_busy_evidence.into_iter().collect::<Vec<_>>());
     }
     let plan = SolverPlan {
         slots: slots
@@ -517,6 +568,8 @@ pub fn optimize(
             .into_iter()
             .map(|event| (event.id, event.updated_at))
             .collect(),
+        settings_json: Some(canonical_settings_snapshot(&settings)?),
+        dependencies: Some(list_dependencies(conn)?),
     })
     .map_err(internal)?;
     let proposal = PlannerProposal {
@@ -535,6 +588,7 @@ pub fn optimize(
     for assignment in &solved.tasks {
         let task = &tasks[assignment.id];
         let selected = assignment.start_slot_idx.and_then(|index| slots.get(index));
+        let has_hard_feasible_slot = assignment.feasible.iter().any(|allowed| *allowed);
         let (start_at, end_at, cognitive_penalty) = if let Some(slot) = selected {
             (
                 Some(
@@ -559,8 +613,30 @@ pub fn optimize(
             (None, None, 0)
         };
         let fatigue_penalty = fatigue_penalty(assignment, &solved.tasks, &slots, &settings);
-        let explanation = if selected.is_none() {
-            Some("No feasible slot within the configured horizon.".into())
+        let diagnostics = if selected.is_none() && !has_hard_feasible_slot {
+            let evidence = &busy_evidence[assignment.id];
+            let busy_blockers = evidence
+                .iter()
+                .take(5)
+                .map(|index| busy_blocker(&busy[*index], timezone))
+                .collect();
+            PlannerProposalDiagnostics {
+                outcome: PlannerProposalOutcome::NoHardFeasibleSlot,
+                busy_blockers,
+                busy_blockers_omitted: evidence.len().saturating_sub(5),
+            }
+        } else if selected.is_none() {
+            PlannerProposalDiagnostics {
+                outcome: PlannerProposalOutcome::FeasibleButNotSelected,
+                ..Default::default()
+            }
+        } else {
+            PlannerProposalDiagnostics::default()
+        };
+        let explanation = if selected.is_none() && !has_hard_feasible_slot {
+            Some("No hard-feasible slot within the configured horizon.".into())
+        } else if selected.is_none() {
+            Some("Hard-feasible slots exist, but the optimizer could not select one with the other tasks.".into())
         } else if fatigue_penalty > 0 {
             Some("High cognitive-load streak exceeds the configured recovery policy.".into())
         } else if cognitive_penalty > 0 {
@@ -578,12 +654,18 @@ pub fn optimize(
             cognitive_penalty,
             fatigue_penalty,
             explanation,
+            diagnostics,
         };
-        conn.execute("INSERT INTO planner_proposal_items (id,proposal_id,task_id,start_at,end_at,scheduled,cognitive_penalty,fatigue_penalty,explanation) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
-            params![item.id,item.proposal_id,item.task_id,item.start_at,item.end_at,item.scheduled as i64,item.cognitive_penalty,item.fatigue_penalty,item.explanation]).map_err(internal)?;
+        let diagnostics_json = serde_json::to_string(&item.diagnostics).map_err(internal)?;
+        conn.execute("INSERT INTO planner_proposal_items (id,proposal_id,task_id,start_at,end_at,scheduled,cognitive_penalty,fatigue_penalty,explanation,diagnostics_json) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+            params![item.id,item.proposal_id,item.task_id,item.start_at,item.end_at,item.scheduled as i64,item.cognitive_penalty,item.fatigue_penalty,item.explanation,diagnostics_json]).map_err(internal)?;
         items.push(item);
     }
-    Ok(ProposalDetail { proposal, items })
+    Ok(ProposalDetail {
+        proposal,
+        items,
+        applicability: ProposalApplicability::ready(),
+    })
 }
 
 pub fn list_proposals(conn: &Connection) -> Result<Vec<PlannerProposal>, PlannerError> {
@@ -595,13 +677,17 @@ pub fn list_proposals(conn: &Connection) -> Result<Vec<PlannerProposal>, Planner
 pub fn proposal(conn: &Connection, id: &str) -> Result<ProposalDetail, PlannerError> {
     let proposal = conn.query_row("SELECT id,status,horizon_start,horizon_days,timezone,score,created_at,applied_at FROM planner_proposals WHERE id=?1", [id], proposal_from_row).optional().map_err(internal)?
         .ok_or_else(|| PlannerError::NotFound { resource: "proposal", id: id.into() })?;
-    let mut stmt = conn.prepare("SELECT id,proposal_id,task_id,start_at,end_at,scheduled,cognitive_penalty,fatigue_penalty,explanation FROM planner_proposal_items WHERE proposal_id=?1 ORDER BY start_at,task_id").map_err(internal)?;
+    let mut stmt = conn.prepare("SELECT id,proposal_id,task_id,start_at,end_at,scheduled,cognitive_penalty,fatigue_penalty,explanation,diagnostics_json FROM planner_proposal_items WHERE proposal_id=?1 ORDER BY start_at,task_id").map_err(internal)?;
     let items = stmt
         .query_map([id], proposal_item_from_row)
         .map_err(internal)?
         .collect::<rusqlite::Result<Vec<_>>>()
         .map_err(internal)?;
-    Ok(ProposalDetail { proposal, items })
+    Ok(ProposalDetail {
+        applicability: proposal_applicability(conn, id)?,
+        proposal,
+        items,
+    })
 }
 
 pub fn apply_proposal(conn: &Connection, id: &str) -> Result<ProposalDetail, PlannerError> {
@@ -755,6 +841,7 @@ fn proposal_from_row(row: &Row<'_>) -> rusqlite::Result<PlannerProposal> {
     })
 }
 fn proposal_item_from_row(row: &Row<'_>) -> rusqlite::Result<PlannerProposalItem> {
+    let diagnostics_json: String = row.get(9)?;
     Ok(PlannerProposalItem {
         id: row.get(0)?,
         proposal_id: row.get(1)?,
@@ -765,6 +852,7 @@ fn proposal_item_from_row(row: &Row<'_>) -> rusqlite::Result<PlannerProposalItem
         cognitive_penalty: row.get(6)?,
         fatigue_penalty: row.get(7)?,
         explanation: row.get(8)?,
+        diagnostics: serde_json::from_str(&diagnostics_json).unwrap_or_default(),
     })
 }
 fn settings_from_row(row: &Row<'_>) -> rusqlite::Result<PlannerSettings> {
@@ -868,6 +956,16 @@ fn require_task(conn: &Connection, id: &str) -> Result<PlanningTask, PlannerErro
 }
 fn normalize_timezone(value: &str) -> Result<String, PlannerError> {
     time::normalize_timezone(value).map_err(validation)
+}
+
+fn canonical_settings_snapshot(settings: &PlannerSettings) -> Result<String, PlannerError> {
+    let availability: Availability =
+        serde_json::from_str(&settings.availability_json).map_err(|error| {
+            PlannerError::Validation(format!("invalid planner availability: {error}"))
+        })?;
+    let mut value = serde_json::to_value(settings).map_err(internal)?;
+    value["availability_json"] = serde_json::to_value(availability).map_err(internal)?;
+    serde_json::to_string(&value).map_err(internal)
 }
 fn normalize_clock(value: &str) -> Result<String, PlannerError> {
     NaiveTime::parse_from_str(value, "%H:%M")
@@ -1059,13 +1157,23 @@ fn require_google_checkpoint(conn: &Connection) -> Result<(), PlannerError> {
     }
     Ok(())
 }
+#[derive(Debug)]
+struct BusyOccurrence {
+    start: DateTime<Utc>,
+    end: DateTime<Utc>,
+    event_id: String,
+    event_title: String,
+    calendar_id: String,
+    recurring: bool,
+}
+
 type UtcInterval = (DateTime<Utc>, DateTime<Utc>);
 
 fn busy_intervals(
     conn: &Connection,
     horizon_start: DateTime<Utc>,
     horizon_end: DateTime<Utc>,
-) -> Result<Vec<UtcInterval>, PlannerError> {
+) -> Result<Vec<BusyOccurrence>, PlannerError> {
     db::load_events(conn)
         .map_err(internal)?
         .into_iter()
@@ -1079,7 +1187,7 @@ fn event_busy_intervals(
     event: &Event,
     horizon_start: DateTime<Utc>,
     horizon_end: DateTime<Utc>,
-) -> Result<Vec<UtcInterval>, PlannerError> {
+) -> Result<Vec<BusyOccurrence>, PlannerError> {
     let (start, end) = match event.start_dt().zip(event.end_dt()) {
         Some(interval) => interval,
         None => return Ok(Vec::new()),
@@ -1101,7 +1209,7 @@ fn event_busy_intervals(
                     event.title
                 ))
             })?;
-        let occurrences = rule
+        let result = rule
             .build(recurrence_start)
             .map_err(|error| {
                 PlannerError::Validation(format!(
@@ -1111,9 +1219,16 @@ fn event_busy_intervals(
             })?
             .after((horizon_start - duration).with_timezone(&rrule::Tz::from(timezone)))
             .before(horizon_end.with_timezone(&rrule::Tz::from(timezone)))
-            .all(u16::MAX)
-            .dates;
-        occurrences
+            .all(u16::MAX);
+        if result.limited {
+            return Err(PlannerError::Validation(format!(
+                "event '{}' recurrence exceeds the {}-occurrence safety limit within the planning horizon",
+                event.title,
+                u16::MAX
+            )));
+        }
+        result
+            .dates
             .into_iter()
             .map(|occurrence| occurrence.with_timezone(&Utc))
             .collect()
@@ -1123,16 +1238,35 @@ fn event_busy_intervals(
 
     Ok(starts
         .into_iter()
-        .map(|occurrence_start| (occurrence_start, occurrence_start + duration))
-        .filter(|(occurrence_start, occurrence_end)| {
-            overlaps(
-                *occurrence_start,
-                *occurrence_end,
-                horizon_start,
-                horizon_end,
-            )
+        .map(|occurrence_start| BusyOccurrence {
+            start: occurrence_start,
+            end: occurrence_start + duration,
+            event_id: event.id.clone(),
+            event_title: event.title.clone(),
+            calendar_id: event.calendar_id.clone(),
+            recurring: event.rrule.is_some(),
         })
+        .filter(|occurrence| overlaps(occurrence.start, occurrence.end, horizon_start, horizon_end))
         .collect())
+}
+
+fn busy_blocker(occurrence: &BusyOccurrence, timezone: Tz) -> PlannerBusyBlocker {
+    PlannerBusyBlocker {
+        event_id: occurrence.event_id.clone(),
+        event_title: occurrence.event_title.clone(),
+        calendar_id: occurrence.calendar_id.clone(),
+        start_at: occurrence
+            .start
+            .with_timezone(&timezone)
+            .format(time::STORAGE_FORMAT)
+            .to_string(),
+        end_at: occurrence
+            .end
+            .with_timezone(&timezone)
+            .format(time::STORAGE_FORMAT)
+            .to_string(),
+        recurring: occurrence.recurring,
+    }
 }
 fn applied_high_intervals(conn: &Connection) -> Result<Vec<UtcInterval>, PlannerError> {
     let mut stmt=conn.prepare("SELECT e.start_at,e.end_at,e.timezone FROM planning_tasks t JOIN planning_task_events l ON l.task_id=t.id JOIN events e ON e.id=l.event_id WHERE t.cognitive_load='high' AND e.deleted_at IS NULL").map_err(internal)?;
@@ -1397,7 +1531,26 @@ fn applied_fatigue_cost(
         0
     }
 }
-fn validate_snapshot(conn: &Connection, id: &str) -> Result<(), PlannerError> {
+pub fn proposal_applicability(
+    conn: &Connection,
+    id: &str,
+) -> Result<ProposalApplicability, PlannerError> {
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM planner_proposals WHERE id=?1",
+            [id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(internal)?
+        .ok_or_else(|| PlannerError::NotFound {
+            resource: "proposal",
+            id: id.into(),
+        })?;
+    let mut reasons = Vec::new();
+    if status != "ready" {
+        reasons.push("proposal_is_not_ready".into());
+    }
     let raw: String = conn
         .query_row(
             "SELECT snapshot_json FROM planner_proposals WHERE id=?1",
@@ -1406,12 +1559,13 @@ fn validate_snapshot(conn: &Connection, id: &str) -> Result<(), PlannerError> {
         )
         .map_err(internal)?;
     let snapshot: ProposalSnapshot = serde_json::from_str(&raw).map_err(internal)?;
+    if snapshot.settings_json.is_none() || snapshot.dependencies.is_none() {
+        reasons.push("legacy_snapshot_requires_reoptimization".into());
+    }
     for (task_id, version) in snapshot.task_versions {
-        let task = require_task(conn, &task_id)?;
-        if task.updated_at != version {
-            return Err(PlannerError::Conflict(
-                "proposal is stale because an inbox task changed".into(),
-            ));
+        match require_task(conn, &task_id) {
+            Ok(task) if task.updated_at == version => {}
+            _ => reasons.push("inbox_task_changed".into()),
         }
     }
     let events: HashMap<_, _> = db::load_events(conn)
@@ -1420,9 +1574,33 @@ fn validate_snapshot(conn: &Connection, id: &str) -> Result<(), PlannerError> {
         .map(|event| (event.id, event.updated_at))
         .collect();
     if events != snapshot.event_versions {
-        return Err(PlannerError::Conflict(
-            "proposal is stale because calendar availability changed".into(),
-        ));
+        reasons.push("calendar_availability_changed".into());
+    }
+    if let Some(settings_json) = snapshot.settings_json {
+        if canonical_settings_snapshot(&settings(conn)?)? != settings_json {
+            reasons.push("planner_settings_changed".into());
+        }
+    }
+    if let Some(dependencies) = snapshot.dependencies {
+        if list_dependencies(conn)? != dependencies {
+            reasons.push("planner_dependencies_changed".into());
+        }
+    }
+    reasons.sort();
+    reasons.dedup();
+    Ok(ProposalApplicability {
+        can_apply: reasons.is_empty(),
+        reasons,
+    })
+}
+
+fn validate_snapshot(conn: &Connection, id: &str) -> Result<(), PlannerError> {
+    let applicability = proposal_applicability(conn, id)?;
+    if !applicability.can_apply {
+        return Err(PlannerError::Conflict(format!(
+            "proposal is stale: {}",
+            applicability.reasons.join(", ")
+        )));
     }
     Ok(())
 }
@@ -1453,6 +1631,28 @@ mod tests {
             deadline_kind: DeadlineKind::None,
             deadline_at: None,
         }
+    }
+
+    fn configure_utc_workweek(conn: &Connection) {
+        let mut availability = BTreeMap::new();
+        for day in ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] {
+            availability.insert(
+                day.into(),
+                vec![TimeWindow {
+                    start: "08:00".into(),
+                    end: "18:00".into(),
+                }],
+            );
+        }
+        update_settings(
+            conn,
+            SettingsUpdate {
+                timezone: Some("UTC".into()),
+                availability: Some(Availability(availability)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
     }
 
     #[test]
@@ -1533,7 +1733,7 @@ mod tests {
         let starts = busy_intervals(&conn, horizon_start, horizon_end)
             .unwrap()
             .into_iter()
-            .map(|(start, _)| start.format("%Y-%m-%d %H:%M").to_string())
+            .map(|occurrence| occurrence.start.format("%Y-%m-%d %H:%M").to_string())
             .collect::<Vec<_>>();
 
         assert_eq!(
@@ -1588,6 +1788,53 @@ mod tests {
 
         let proposal = optimize(&conn, Some(2)).unwrap();
         assert!(!proposal.items[0].scheduled);
+        assert_eq!(
+            proposal.items[0].diagnostics.outcome,
+            PlannerProposalOutcome::NoHardFeasibleSlot
+        );
+        assert!(proposal.items[0].diagnostics.busy_blockers[0].recurring);
+    }
+
+    #[test]
+    fn proposal_becomes_stale_when_settings_change() {
+        let (_temp, conn, calendar_id) = connection();
+        configure_utc_workweek(&conn);
+        create_task(&conn, task(calendar_id, "Settings-sensitive task")).unwrap();
+        let proposal = optimize(&conn, Some(2)).unwrap();
+
+        update_settings(
+            &conn,
+            SettingsUpdate {
+                slot_minutes: Some(30),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let applicability = proposal_applicability(&conn, &proposal.proposal.id).unwrap();
+        assert!(!applicability.can_apply);
+        assert!(applicability
+            .reasons
+            .iter()
+            .any(|reason| reason == "planner_settings_changed"));
+    }
+
+    #[test]
+    fn proposal_becomes_stale_when_dependencies_change() {
+        let (_temp, conn, calendar_id) = connection();
+        configure_utc_workweek(&conn);
+        let first = create_task(&conn, task(calendar_id.clone(), "First")).unwrap();
+        let second = create_task(&conn, task(calendar_id, "Second")).unwrap();
+        let proposal = optimize(&conn, Some(2)).unwrap();
+
+        add_dependency(&conn, &first.id, &second.id).unwrap();
+
+        let applicability = proposal_applicability(&conn, &proposal.proposal.id).unwrap();
+        assert!(!applicability.can_apply);
+        assert!(applicability
+            .reasons
+            .iter()
+            .any(|reason| reason == "planner_dependencies_changed"));
     }
 
     #[test]

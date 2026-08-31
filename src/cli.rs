@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use anyhow::Context;
 use chrono::NaiveDateTime;
 use clap::{Args, Parser, Subcommand, ValueEnum};
@@ -449,7 +451,9 @@ pub struct PlannerSettingsArgs {
     #[arg(long)]
     pub timezone: Option<String>,
     #[arg(long)]
-    pub availability_json: Option<String>,
+    /// Replace weekly availability with one or more DAY=HH:MM-HH:MM windows.
+    #[arg(long, value_name = "DAY=START-END")]
+    pub availability: Vec<String>,
     #[arg(long)]
     pub horizon_days: Option<i64>,
     #[arg(long)]
@@ -652,10 +656,10 @@ pub fn execute_with_connection(conn: &Connection, cli: Cli) -> Result<Value, Cli
     execute_with_backend(conn, cli, &RealGoogleSyncBackend)
 }
 
-fn execute_with_backend(
+fn execute_with_backend<B: GoogleSyncBackend>(
     conn: &Connection,
     cli: Cli,
-    google_sync_backend: &dyn GoogleSyncBackend,
+    google_sync_backend: &B,
 ) -> Result<Value, CliError> {
     let data = match cli.command {
         Command::Calendars { action } => handle_calendars(conn, action)?,
@@ -685,6 +689,33 @@ fn parse_timestamp_arg(value: &str) -> Result<String, String> {
                 value
             )
         })
+}
+
+fn parse_availability_args(values: Vec<String>) -> Result<Option<planner::Availability>, CliError> {
+    if values.is_empty() {
+        return Ok(None);
+    }
+    let mut days: BTreeMap<String, Vec<planner::TimeWindow>> = BTreeMap::new();
+    for value in values {
+        let (day, window) = value.split_once('=').ok_or_else(|| {
+            CliError::invalid_arguments(format!(
+                "invalid --availability '{}'; expected DAY=HH:MM-HH:MM",
+                value
+            ))
+        })?;
+        let (start, end) = window.split_once('-').ok_or_else(|| {
+            CliError::invalid_arguments(format!(
+                "invalid --availability '{}'; expected DAY=HH:MM-HH:MM",
+                value
+            ))
+        })?;
+        let weekday = day.to_ascii_lowercase();
+        days.entry(weekday).or_default().push(planner::TimeWindow {
+            start: start.into(),
+            end: end.into(),
+        });
+    }
+    Ok(Some(planner::Availability(days)))
 }
 
 fn handle_calendars(conn: &Connection, action: CalendarCommand) -> Result<Value, CliError> {
@@ -1143,19 +1174,12 @@ fn handle_planner(conn: &Connection, action: PlannerCommand) -> Result<Value, Cl
     match action {
         PlannerCommand::Settings { action } => match action {
             PlannerSettingsCommand::Show => {
-                Ok(json!(planner::settings(conn).map_err(planner_error)?))
+                Ok(planner::settings_json(conn).map_err(planner_error)?)
             }
             PlannerSettingsCommand::Update(args) => {
                 let args = *args;
-                let availability = args
-                    .availability_json
-                    .map(|json| {
-                        serde_json::from_str(&json).map_err(|error| {
-                            CliError::validation(format!("invalid --availability-json: {error}"))
-                        })
-                    })
-                    .transpose()?;
-                Ok(json!(planner::update_settings(
+                let availability = parse_availability_args(args.availability)?;
+                planner::update_settings(
                     conn,
                     planner::SettingsUpdate {
                         timezone: args.timezone,
@@ -1179,9 +1203,10 @@ fn handle_planner(conn: &Connection, action: PlannerCommand) -> Result<Value, Cl
                         high_streak_limit: args.high_streak_limit,
                         recovery_minutes: args.recovery_minutes,
                         excess_high_penalty: args.excess_high_penalty,
-                    }
+                    },
                 )
-                .map_err(planner_error)?))
+                .map_err(planner_error)?;
+                Ok(planner::settings_json(conn).map_err(planner_error)?)
             }
         },
         PlannerCommand::Optimize(args) => Ok(json!(
@@ -1234,10 +1259,10 @@ fn planner_error(error: planner::PlannerError) -> CliError {
     }
 }
 
-fn handle_google_with_backend(
+fn handle_google_with_backend<B: GoogleSyncBackend>(
     conn: &Connection,
     action: GoogleCommand,
-    google_sync_backend: &dyn GoogleSyncBackend,
+    google_sync_backend: &B,
 ) -> Result<Value, CliError> {
     match action {
         GoogleCommand::Auth { action } => handle_google_auth(action),

@@ -9,6 +9,7 @@ const MIGRATION_V3: &str = "20260412000001";
 const MIGRATION_V4: &str = "20260830000001";
 const MIGRATION_V5: &str = "20260831000001";
 const MIGRATION_V6: &str = "20260831000002";
+const MIGRATION_V7: &str = "20260831000003";
 
 /* Path to the calendar database. */
 pub fn db_path() -> PathBuf {
@@ -83,6 +84,11 @@ fn migrate(conn: &Connection) -> Result<()> {
     if !migration_applied(conn, MIGRATION_V6)? {
         migrate_v6(conn)?;
         record_migration(conn, MIGRATION_V6)?;
+    }
+
+    if !migration_applied(conn, MIGRATION_V7)? {
+        migrate_v7(conn)?;
+        record_migration(conn, MIGRATION_V7)?;
     }
 
     Ok(())
@@ -405,6 +411,15 @@ fn migrate_v5(conn: &Connection) -> Result<()> {
 fn migrate_v6(conn: &Connection) -> Result<()> {
     conn.execute(
         "UPDATE events SET rrule = substr(rrule, 7) WHERE rrule LIKE 'RRULE:%'",
+        [],
+    )?;
+    Ok(())
+}
+
+fn migrate_v7(conn: &Connection) -> Result<()> {
+    // Keep human explanations intact while storing machine-readable proposal evidence.
+    conn.execute(
+        "ALTER TABLE planner_proposal_items ADD COLUMN diagnostics_json TEXT NOT NULL DEFAULT '{}'",
         [],
     )?;
     Ok(())
