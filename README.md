@@ -206,20 +206,24 @@ Contributor and automation guidance lives in [AGENT.md](AGENT.md). Product scope
 
 ## Architecture
 
-- `src/app.rs`: TUI state machine and worker result handling
-- `src/event_service.rs`: shared event validation, timezone normalization, and Google outbox enqueue rules
-- `src/calendar_service.rs`: shared calendar validation and Google import rules
-- `src/ical.rs`: `.ics` import/export
-- `src/google/auth.rs`: desktop OAuth, keyring storage, and token refresh
+- `src/app.rs` + `src/app/`: stable TUI facade with focused state, input, navigation, form, planner, integration, and worker-result modules
+- `src/cli.rs` + `src/cli/`: stable non-interactive CLI facade with typed arguments, handlers, runtime, validation, and Google backend modules
+- `src/event_service.rs` + `src/event_service/`: shared event facade with validation, mutation, and tests
+- `src/calendar_service.rs` + `src/calendar_service/`: shared calendar facade with validation, mutation, and tests
+- `src/ical.rs` + `src/ical/`: `.ics` facade with parsing, candidate, time, import/export, and test modules
+- `src/google/auth.rs` + `src/google/auth/`: desktop OAuth facade with client, OAuth callback, keyring, and test modules
 - `src/google/discovery.rs`: Google calendar discovery
 - `src/google/events_api.rs`: typed Google Calendar event HTTP adapter
-- `src/google/types.rs`: Google payload mapping and event body generation
+- `src/google/types.rs` + `src/google/types/`: Google payload mapping, event body generation, and tests
 - `src/sync/engine.rs`: sync orchestration and status reporting
 - `src/sync/pull.rs`: incremental inbound sync with `syncToken` recovery
-- `src/sync/push.rs`: outbound create / patch / delete and ETag handling
-- `src/sync/conflicts.rs`: conflict listing and resolution
-- `src/sync/state.rs`: outbox, sync-state, and conflict persistence helpers
-- `tests/cli.rs`: binary-level CLI integration coverage
+- `src/sync/push.rs`, `src/sync/conflicts.rs`, and `src/sync/state.rs`, with matching directories: focused outbound, conflict, and persistence modules
+- `src/db.rs` + `src/db/`: database facade with schema migration, CRUD, sync, and test modules
+- `src/planner.rs` + `src/planner/`: planner facade with settings, task, availability, optimization, proposal, and test modules
+- `src/models.rs` + `src/models/`: stable domain-model facade split by data family
+- `tests/cli.rs` + `tests/cli/`: binary-level CLI integration coverage split by command family
+
+Every tracked Rust source and test file stays below 300 lines. Public root module paths remain stable; comments move with the code they document.
 
 ## Development
 

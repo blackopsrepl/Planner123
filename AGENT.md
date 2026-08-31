@@ -29,15 +29,17 @@ Direct cargo commands used in CI:
 - `PRD.md`: current product requirements for the v0.4.x milestone
 - `src/main.rs`: TUI entrypoint
 - `src/bin/solverforge-calendar-cli.rs`: CLI entrypoint
-- `src/app.rs`: TUI state machine and worker result handling
-- `src/cli.rs`: typed CLI parsing, JSON responses, and command dispatch
-- `src/calendar_service.rs`: shared calendar validation and Google import rules
-- `src/event_service.rs`: shared event validation, timezone normalization, and Google outbox rules
-- `src/ical.rs`: `.ics` import/export
-- `src/google/`: OAuth, calendar discovery, typed event API, and Google payload mapping
-- `src/sync/`: sync engine, pull, push, conflicts, and persisted sync state helpers
-- `src/db.rs`: SQLite schema, migrations, CRUD helpers, sync metadata tables, and planner proposal evidence
-- `tests/cli.rs`: binary-level CLI integration tests, including the JSON-first planner contract
+- `src/app.rs` and `src/app/`: stable TUI facade plus state, dispatch, navigation, forms, planner, integrations, and worker-result modules
+- `src/cli.rs` and `src/cli/`: stable typed CLI facade plus arguments, handlers, runtime, validation, and backend modules
+- `src/calendar_service.rs` and `src/calendar_service/`: shared calendar facade plus validation, mutation, and test modules
+- `src/event_service.rs` and `src/event_service/`: shared event facade plus validation, mutation, and test modules
+- `src/ical.rs` and `src/ical/`: `.ics` facade plus parsing, candidate, time, import/export, and test modules
+- `src/google/`: OAuth, calendar discovery, typed event API, and Google payload mapping; its larger concerns use the same facade-plus-fragments pattern
+- `src/sync/`: sync engine, pull, push, conflicts, and persisted sync-state helpers, each split by responsibility
+- `src/db.rs` and `src/db/`: SQLite facade plus schema migrations, CRUD families, sync metadata, planner evidence, and tests
+- `src/planner.rs` and `src/planner/`: planner facade plus settings, tasks, availability, optimization, proposal lifecycle, evidence, and tests
+- `src/models.rs` and `src/models/`: stable data-model facade plus calendar, event, dependency, planning, and proposal types
+- `tests/cli.rs` and `tests/cli/`: binary-level CLI integration facade plus command-family test modules
 - `docs/wireframes/`: ASCII references for the CLI and TUI surfaces
 
 ## Constraints
@@ -63,6 +65,13 @@ If you touch the CLI contract, update:
 - `README.md`
 - `tests/cli.rs`
 - `docs/wireframes/cli.md`
+
+## Source size and module boundaries
+
+Keep every tracked Rust source and test file below 300 lines. Large public
+subsystems retain their existing root module as a stable facade and place
+cohesive implementation fragments in the matching directory. Move comments
+with the code they explain; do not delete them while restructuring.
 
 If you touch Google sync or `.ics` behavior, update:
 
