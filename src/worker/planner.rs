@@ -79,7 +79,7 @@ impl Worker {
         self.rt.spawn_blocking(move || {
             let result = (|| -> Result<_> {
                 let conn = crate::db::open()?;
-                crate::planner::list_tasks(&conn).map_err(anyhow::Error::from)
+                crate::planner::list_inbox_tasks(&conn).map_err(anyhow::Error::from)
             })();
             match result {
                 Ok(tasks) => {
@@ -153,7 +153,7 @@ impl Worker {
                 let conn = crate::db::open()?;
                 let task =
                     crate::planner::create_task(&conn, input).map_err(anyhow::Error::from)?;
-                let tasks = crate::planner::list_tasks(&conn).map_err(anyhow::Error::from)?;
+                let tasks = crate::planner::list_inbox_tasks(&conn).map_err(anyhow::Error::from)?;
                 Ok::<_, anyhow::Error>((task, tasks))
             })();
             match result {

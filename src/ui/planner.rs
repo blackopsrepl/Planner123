@@ -10,7 +10,10 @@ use crate::{app::App, theme, ui::util::centered_rect};
 
 pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
     let [tasks_area, proposal_area] =
-        Layout::vertical([Constraint::Percentage(58), Constraint::Percentage(42)]).areas(area);
+        Layout::vertical([Constraint::Percentage(62), Constraint::Percentage(38)]).areas(area);
+    let [task_list_area, task_detail_area] =
+        Layout::vertical([Constraint::Percentage(55), Constraint::Percentage(45)])
+            .areas(tasks_area);
     let tasks: Vec<ListItem> = if app.planner_tasks.is_empty() {
         vec![ListItem::new("No inbox tasks. Press n to add one.")]
     } else {
@@ -47,7 +50,46 @@ pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
                 .borders(Borders::ALL)
                 .title(" Planner Inbox "),
         ),
-        tasks_area,
+        task_list_area,
+    );
+    let task_detail = match app.planner_tasks.get(app.planner_selected_index) {
+        Some(task) => {
+            let calendar = app
+                .calendars
+                .iter()
+                .find(|calendar| calendar.id == task.target_calendar_id)
+                .map(|calendar| calendar.name.as_str())
+                .unwrap_or("unknown calendar");
+            vec![
+                Line::from(format!(
+                    "{}  ({} minutes)",
+                    task.title, task.duration_minutes
+                )),
+                Line::from(format!("Calendar: {calendar}")),
+                Line::from(format!(
+                    "Priority: {:?}    Cognitive load: {:?}",
+                    task.priority, task.cognitive_load
+                )),
+                Line::from(format!(
+                    "Earliest: {}    Deadline: {:?} {}",
+                    task.earliest_at.as_deref().unwrap_or("none"),
+                    task.deadline_kind,
+                    task.deadline_at.as_deref().unwrap_or("")
+                )),
+                Line::from(format!("Task ID: {}", task.id)),
+            ]
+        }
+        None => vec![Line::from(
+            "Select an inbox task with j/k to inspect its scheduling details.",
+        )],
+    };
+    frame.render_widget(
+        Paragraph::new(task_detail).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Selected Task "),
+        ),
+        task_detail_area,
     );
     let proposal = match &app.planner_proposal {
         Some(detail) => {
@@ -65,14 +107,16 @@ pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
                     ))
                 })
                 .collect::<Vec<_>>();
-            let mut text = vec![
-                Line::from(format!(
-                    "Proposal {}: {scheduled}/{} scheduled",
-                    &detail.proposal.id[..8],
-                    detail.items.len()
-                )),
-                Line::from("Press a to apply this reviewed proposal."),
-            ];
+            let mut text = vec![Line::from(format!(
+                "Proposal {}: {scheduled}/{} scheduled",
+                &detail.proposal.id[..8],
+                detail.items.len()
+            ))];
+            text.push(Line::from(if detail.proposal.status == "ready" {
+                "Press a to apply this reviewed proposal."
+            } else {
+                "This proposal has already been applied."
+            }));
             text.extend(lines);
             text
         }

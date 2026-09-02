@@ -38,6 +38,9 @@ impl App {
             View::Agenda => {
                 self.agenda_scroll = self.agenda_scroll.saturating_sub(1);
             }
+            View::PlannerInbox => {
+                self.planner_selected_index = self.planner_selected_index.saturating_sub(1);
+            }
             _ => {}
         }
     }
@@ -55,6 +58,9 @@ impl App {
             }
             View::Agenda => {
                 self.agenda_scroll = self.agenda_scroll.saturating_add(1);
+            }
+            View::PlannerInbox if self.planner_selected_index + 1 < self.planner_tasks.len() => {
+                self.planner_selected_index += 1;
             }
             _ => {}
         }

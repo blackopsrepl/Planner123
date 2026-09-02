@@ -165,6 +165,6 @@ pub use proposals::{apply_proposal, list_proposals, proposal, return_to_inbox};
 pub use settings::{settings, settings_json, update_settings};
 pub use settings_validation::validate_availability;
 pub use tasks::{
-    add_dependency, create_task, delete_task, get_task, list_dependencies, list_tasks,
-    remove_dependency, update_task,
+    add_dependency, create_task, delete_task, get_task, list_dependencies, list_inbox_tasks,
+    list_tasks, remove_dependency, update_task,
 };

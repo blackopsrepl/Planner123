@@ -35,6 +35,19 @@ pub fn list_tasks(conn: &Connection) -> Result<Vec<PlanningTask>, PlannerError> 
     rows.collect::<rusqlite::Result<Vec<_>>>().map_err(internal)
 }
 
+/// Returns only work that still awaits scheduling in the Planner Inbox.
+/// Applied tasks remain available through `list_tasks` and `get_task` as
+/// lifecycle records, but must not be presented as inbox work.
+pub fn list_inbox_tasks(conn: &Connection) -> Result<Vec<PlanningTask>, PlannerError> {
+    let mut stmt = conn.prepare(
+        "SELECT id,title,duration_minutes,target_calendar_id,project_id,priority,cognitive_load,
+                earliest_at,deadline_kind,deadline_at,state,created_at,updated_at
+         FROM planning_tasks WHERE state='inbox' ORDER BY created_at, title",
+    ).map_err(internal)?;
+    let rows = stmt.query_map([], task_from_row).map_err(internal)?;
+    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(internal)
+}
+
 pub fn get_task(conn: &Connection, id: &str) -> Result<Option<PlanningTask>, PlannerError> {
     conn.query_row(
         "SELECT id,title,duration_minutes,target_calendar_id,project_id,priority,cognitive_load,

@@ -156,9 +156,13 @@ impl App {
             }
             Action::PlannerApply => {
                 if let Some(proposal) = &self.planner_proposal {
-                    self.loading = true;
-                    self.worker
-                        .apply_planner_proposal(proposal.proposal.id.clone());
+                    if proposal.proposal.status == "ready" {
+                        self.loading = true;
+                        self.worker
+                            .apply_planner_proposal(proposal.proposal.id.clone());
+                    } else {
+                        self.set_status("This planner proposal has already been applied.", true);
+                    }
                 } else {
                     self.set_status("No proposal is ready to apply.", true);
                 }

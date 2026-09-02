@@ -63,6 +63,7 @@ pub fn hints(view: &View) -> Vec<Hint> {
         ],
         View::GoogleAuth => vec![("Tab", "field"), ("Enter", "confirm"), ("Esc", "cancel")],
         View::PlannerInbox => vec![
+            ("j/k", "inspect task"),
             ("n", "new task"),
             ("o", "optimize"),
             ("a", "apply"),

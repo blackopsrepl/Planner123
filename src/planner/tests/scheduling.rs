@@ -14,6 +14,23 @@ fn inbox_task_keeps_cognitive_load_and_deadline_contract() {
 }
 
 #[test]
+fn applied_tasks_are_not_returned_by_the_inbox_query() {
+    let (_temp, conn, calendar_id) = connection();
+    configure_utc_workweek(&conn);
+    let created = create_task(&conn, task(calendar_id, "Schedule once")).unwrap();
+    let proposal = optimize(&conn, None).unwrap();
+
+    apply_proposal(&conn, &proposal.proposal.id).unwrap();
+
+    assert!(list_inbox_tasks(&conn).unwrap().is_empty());
+    assert_eq!(
+        get_task(&conn, &created.id).unwrap().unwrap().state,
+        PlanningTaskState::Applied
+    );
+    assert_eq!(list_tasks(&conn).unwrap().len(), 1);
+}
+
+#[test]
 fn local_day_horizons_include_every_dst_instant_and_no_more() {
     let timezone = Tz::from_str("Europe/Rome").unwrap();
     for (date, hours) in [("2026-03-29", 23), ("2026-10-25", 25)] {
