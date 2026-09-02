@@ -9,13 +9,7 @@ pub const STORAGE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 pub fn local_timezone_name() -> String {
     iana_time_zone::get_timezone()
         .ok()
-        .and_then(|timezone| {
-            if Tz::from_str(&timezone).is_ok() {
-                Some(timezone)
-            } else {
-                None
-            }
-        })
+        .filter(|timezone| Tz::from_str(timezone).is_ok())
         .unwrap_or_else(|| "UTC".to_string())
 }
 
