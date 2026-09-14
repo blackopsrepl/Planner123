@@ -150,6 +150,26 @@ Planner behavior:
 - Applied planner tasks remain fixed. `tasks return-to-inbox <task-id>` explicitly deletes only that task's linked event through the normal sync outbox.
 - Active Google calendars require a previously successful explicit sync before optimization. Applying a proposal never auto-syncs.
 
+### Agent skill
+
+A portable [Agent Skill](skills/solverforge-calendar/SKILL.md) teaches any
+agent the full JSON contract, data isolation, planner workflow, and repo
+maintenance rules. The repo also ships `.agents/skills/solverforge-calendar`
+pointing at it, so Codex picks the skill up automatically when working inside
+this repository. For user-scope installs (symlinks that stay in sync with this
+checkout):
+
+```bash
+./scripts/install-skill                 # opencode + Codex (~/.agents/skills)
+./scripts/install-skill --only codex    # just Codex user scope
+./scripts/install-skill --only opencode # just opencode
+./scripts/install-skill --copy          # copy instead of symlink
+./scripts/install-skill --list          # show install state
+./scripts/install-skill --uninstall     # remove
+```
+
+Restart the agent after installing so it rescans skills.
+
 Available groups:
 
 - `calendars`: `list`, `get`, `create`, `update`, `delete`
