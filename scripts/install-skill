@@ -1,0 +1,168 @@
+#!/usr/bin/env sh
+set -eu
+
+# Install the bundled agent skill into the directories agents scan:
+# opencode (~/.config/opencode/skills), Codex (user scope, ~/.agents/skills —
+# the Agent Skills standard location Codex reads), and this repository's
+# .agents/skills (repo scope, which Codex scans from any working directory
+# inside the repo). Default action is a symlink so the skill tracks this
+# checkout; use --copy to duplicate instead.
+
+usage() {
+	cat <<'EOF'
+Usage: scripts/install-skill [--copy] [--only opencode|codex|repo]... [--uninstall] [--list] [--help]
+
+Install skills/solverforge-calendar into the skill directories agents scan.
+
+  --copy            copy instead of symlink (default: symlink; ignored for repo)
+  --only <target>   restrict to a target: opencode, codex, repo (repeatable)
+  --uninstall       remove previously installed links/copies
+  --list            show target directories and their install state
+  --help            show this help
+
+Targets:
+  opencode  ~/.config/opencode/skills  (opencode global skills)
+  codex     ~/.agents/skills           (Codex user scope; Agent Skills standard)
+  repo      <repo>/.agents/skills      (Codex repo scope; committed with the repo)
+EOF
+}
+
+skill_name=solverforge-calendar
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+skill_src="$repo_root/skills/$skill_name"
+
+[ -f "$skill_src/SKILL.md" ] || {
+	echo "error: skill source not found at $skill_src/SKILL.md" >&2
+	exit 1
+}
+
+mode=link
+action=install
+only=""
+	target_dir_for() {
+	case "$1" in
+	opencode) printf '%s' "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills" ;;
+	codex) printf '%s' "$HOME/.agents/skills" ;;
+	repo) printf '%s' "$repo_root/.agents/skills" ;;
+	esac
+}
+
+link_target_for() {
+	case "$1" in
+	repo) printf '%s' "../../skills/$skill_name" ;;
+	*) printf '%s' "$skill_src" ;;
+	esac
+}
+
+	while [ $# -gt 0 ]; do
+	case "$1" in
+	--copy) mode=copy ;;
+	--uninstall) action=uninstall ;;
+	--list) action=list ;;
+	--only)
+		shift
+		case "${1:-}" in
+		opencode | codex | repo) only="$only $1" ;;
+		*)
+			echo "error: --only expects opencode, codex, or repo" >&2
+			exit 1
+			;;
+		esac
+		;;
+	--help | -h)
+		usage
+		exit 0
+		;;
+	*)
+		echo "error: unknown option '$1'" >&2
+		usage >&2
+		exit 1
+		;;
+	esac
+	shift
+done
+
+selected() {
+	if [ -n "$only" ]; then
+		case " $only " in
+		*" $1 "*) return 0 ;;
+		*) return 1 ;;
+		esac
+	fi
+	return 0
+}
+
+run_target() {
+	name=$1
+	[ "$action" = list ] && selected "$name" && {
+		dir=$(target_dir_for "$name")
+		if [ -L "$dir/$skill_name" ]; then
+			state="symlink -> $(readlink "$dir/$skill_name")"
+		elif [ -d "$dir/$skill_name" ]; then
+			state="copy present"
+		elif [ -e "$dir/$skill_name" ]; then
+			state="foreign entry present (left untouched)"
+		else
+			state="not installed"
+		fi
+		printf '%-9s %s  %s\n' "$name" "$dir" "$state"
+		return 0
+	}
+
+	selected "$name" || return 0
+	dir=$(target_dir_for "$name")
+	dest="$dir/$skill_name"
+
+	if [ "$name" = repo ] && [ "$mode" = copy ]; then
+		echo "note: repo target is always a symlink; --copy ignored"
+		mode=link
+	fi
+
+	if [ "$action" = uninstall ]; then
+		if [ -L "$dest" ] || [ -f "$dest" ]; then
+			rm -f "$dest" && printf 'uninstalled %-9s %s\n' "$name" "$dest"
+		elif [ -d "$dest" ]; then
+			rm -rf "$dest" && printf 'uninstalled %-9s %s\n' "$name" "$dest"
+		fi
+		return 0
+	fi
+
+	if [ -e "$dest" ] && { [ "$mode" = copy ] || [ ! -L "$dest" ]; }; then
+		case "$mode" in
+		copy)
+			if [ -d "$dest" ] && cmp -s "$skill_src/SKILL.md" "$dest/SKILL.md" 2>/dev/null; then
+				printf 'up-to-date %-9s %s\n' "$name" "$dest"
+				return 0
+			fi
+			;;
+		link)
+			if [ "$(readlink "$dest" 2>/dev/null)" = "$(link_target_for "$name")" ]; then
+				printf 'up-to-date %-9s %s\n' "$name" "$dest"
+				return 0
+			fi
+			;;
+		esac
+		echo "error: $dest exists and is not managed by this installer; remove it first" >&2
+		exit 1
+	fi
+
+	mkdir -p "$dir"
+	if [ "$mode" = copy ]; then
+		rm -rf "$dest"
+		cp -R "$skill_src" "$dest"
+		printf 'copied     %-9s %s\n' "$name" "$dest"
+	else
+		link=$(link_target_for "$name")
+		ln -sfn "$link" "$dest"
+		printf 'linked     %-9s %s -> %s\n' "$name" "$dest" "$link"
+	fi
+}
+
+for target in opencode codex repo; do
+	run_target "$target"
+done
+
+if [ "$action" = install ]; then
+	echo "done. restart your agent (e.g. quit and reopen opencode) so it rescans skills."
+fi
