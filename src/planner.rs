@@ -1,10 +1,10 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, HashMap},
     str::FromStr,
 };
 
 use anyhow::Result;
-use chrono::{DateTime, Datelike, Days, Duration, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, Days, Duration, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
@@ -14,11 +14,14 @@ use uuid::Uuid;
 use crate::{
     db, event_service,
     models::{
-        CalendarSource, CognitiveLoad, DeadlineKind, Event, PlannerBusyBlocker, PlannerProposal,
+        CalendarSource, CognitiveLoad, DeadlineKind, Event, PlannerProposal,
         PlannerProposalDiagnostics, PlannerProposalItem, PlannerProposalOutcome, PlannerSettings,
         PlanningTask, PlanningTaskState, TaskPriority,
     },
-    planner_domain::{SolverPlan, SolverSlot, SolverTask, PLANNER_MANAGER},
+    planner_domain::{
+        SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverPlan, SolverSlot, SolverTask,
+        PLANNER_MANAGER,
+    },
     sync::state,
     time,
 };
@@ -138,7 +141,9 @@ impl ProposalApplicability {
 
 mod applicability;
 mod busy_time;
+pub mod constraints;
 mod database;
+mod load;
 mod optimization;
 mod proposals;
 mod scheduling;
@@ -152,6 +157,7 @@ mod tests;
 use applicability::validate_snapshot;
 use busy_time::*;
 use database::*;
+use load::*;
 use scheduling::*;
 use settings_validation::{
     canonical_settings_snapshot, normalize_clock, normalize_timezone, require_task,

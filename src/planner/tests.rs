@@ -1,5 +1,5 @@
 use super::*;
-use chrono::Timelike;
+use chrono::{Datelike, Timelike};
 use tempfile::TempDir;
 
 fn connection() -> (TempDir, Connection, String) {
@@ -46,5 +46,6 @@ fn configure_utc_workweek(conn: &Connection) {
 }
 
 mod configuration;
+mod end_to_end;
 mod lifecycle;
 mod scheduling;

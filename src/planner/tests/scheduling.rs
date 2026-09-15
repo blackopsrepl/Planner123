@@ -140,7 +140,7 @@ fn optimizer_does_not_schedule_over_a_future_recurring_occurrence() {
     assert!(!proposal.items[0].scheduled);
     assert_eq!(
         proposal.items[0].diagnostics.outcome,
-        PlannerProposalOutcome::NoHardFeasibleSlot
+        PlannerProposalOutcome::Unassigned
     );
-    assert!(proposal.items[0].diagnostics.busy_blockers[0].recurring);
+    assert!(proposal.items[0].explanation.is_some());
 }

@@ -13,13 +13,7 @@ pub mod keys;
 pub mod models;
 pub mod notifications;
 pub mod planner;
-solverforge::planning_model! {
-    root = "src";
-
-    mod planner_domain;
-
-    pub use planner_domain::{SolverPlan, SolverSlot, SolverTask, PLANNER_MANAGER};
-}
+pub mod planner_domain;
 pub mod recurrence;
 pub mod sync;
 pub mod theme;

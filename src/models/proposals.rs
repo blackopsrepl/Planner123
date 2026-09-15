@@ -37,6 +37,7 @@ pub struct PlannerProposalDiagnostics {
 pub enum PlannerProposalOutcome {
     #[default]
     Scheduled,
+    Unassigned,
     NoHardFeasibleSlot,
     FeasibleButNotSelected,
 }
