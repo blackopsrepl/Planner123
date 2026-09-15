@@ -13,90 +13,172 @@
 
 </div>
 
-A ratatui desktop calendar with local SQLite storage, a JSON-first automation CLI, real `.ics` import/export, and conflict-aware Google Calendar sync.
+SolverForge Calendar is a keyboard-driven calendar that runs entirely on your
+machine. Your events live in a local SQLite database — not in someone's cloud —
+while optional two-way Google Calendar sync and `.ics` import/export keep you
+connected to everyone else.
 
-![SolverForge Calendar](assets/screenshot.png)
+The part that makes it different is the built-in **AI planner**: instead of just
+storing your calendar, it can actually schedule your to-do list for you. You
+tell it what needs doing and when you are available; it proposes concrete time
+slots that respect your meetings, deadlines, and the hours in which you do your
+best thinking. Nothing ever lands on your calendar until you review the
+proposal and say yes.
+
+![Month view with events](assets/screenshot.png)
 
 ## Quick Start
 
 ```bash
-# Build both binaries
 cargo build --release
 ./target/release/solverforge-calendar
-
-# Human-facing TUI entrypoint
-cargo run
-
-# Agent-facing CLI entrypoint
-cargo run --bin solverforge-calendar-cli -- calendars list
-
-# Stable wrapper for automation
-./scripts/solverforge-calendar-cli calendars list
 ```
 
-## Features
+That's it — the app creates its database on first launch at
+`~/.local/share/solverforge/calendar.db` and starts with a fresh calendar.
+Press `?` inside the app for the keybinding cheat sheet, or `p` to meet the
+planner.
 
-- Multiple views: month, week, day, and agenda with vim-style navigation
-- Google Calendar: desktop OAuth via system browser, discovery/import, read-only vs writable calendars, explicit sync status, and two-way sync for supported event fields
-- Safe sync: outbound queue, incremental pull sync, ETag-based conflict detection, and CLI conflict resolution
-- Shared event service: TUI, CLI, `.ics` import, and Google sync all route through the same validation and timezone logic
-- Timezone-correct events: local wall-clock timestamps round-trip through a shared IANA timezone layer
-- `.ics` import/export: VEVENT import with warnings for unsupported shapes plus export for local data exchange
-- Event dependencies: DAG-linked events with cycle detection and topological ordering
-- Non-blocking I/O: background workers for DB and Google operations in the TUI
-- Local SQLite database: events, calendars, projects stored in `~/.local/share/solverforge/calendar.db`
-- Desktop notifications: reminder alerts via libnotify
-- SolverForge Planner Inbox: structured tasks, explicit batch proposals, cognitive-time preferences, and review-before-apply scheduling
+If you prefer not to build from source, every feature is also reachable
+through a non-interactive CLI (see [Automating and scripting](#automating-and-scripting)).
 
-## Keybindings
+## Your calendar, day to day
 
-### Global
+### Views
 
-- `Ctrl+c` / `q`: quit
-- `1` / `2` / `3` / `4`: month / week / day / agenda
-- `?`: help
-- `G`: Google management
-- `S`: sync Google calendars now
-- `i`: open `.ics` import
-- `x`: export visible events to `~/solverforge-calendar.ics`
+Press `1`–`4` to switch views:
 
-### Navigation
+- **Month** — the overview. The selected day shows its events; other days show dots.
+- **Week** and **Day** — a time grid with a "now" line, event selection, and scrolling.
+- **Agenda** — a simple upcoming list.
 
-- `h` / `j` / `k` / `l`: move
-- `H` / `L`: previous / next month in month view
-- `Tab`: focus sidebar
-- `Space`: toggle calendar visibility in the sidebar
-- `n`: jump to today / now
+![Week view with time grid](assets/screenshot-week.png)
 
-### Events
+### Working with events
 
-- `c`: create event
-- `e`: edit selected event
-- `d`: delete selected event
-- `Enter`: open or select
-- `/`: quick-add event title into the focused date
+- `c` creates an event on the selected day (title, time, calendar, location,
+  description, repeat rule, reminder, project).
+- `/` quick-adds an event by title into the focused date — the fastest way to
+  capture something.
+- `e` edits and `d` deletes the selected event; `Enter` drills into a day.
+- Events can repeat (weekly, and more via RRULE), can be all-day, can carry a
+  reminder that fires as a desktop notification, and can belong to a project.
+- Calendars are color-coded and can be toggled on/off in the sidebar with
+  `Tab` + `Space`, so you can focus on work, personal, or anything else.
 
-### Planner Inbox
+Press `?` any time for the built-in cheat sheet:
 
-- `p`: open the Planner Inbox
-- `n`: add a structured planner task
-- `s`: configure timezone, weekly availability, horizon, slot size, and solver time. Timezone is a required IANA name such as `Europe/Rome` or `UTC`; the settings form shows the detected local timezone as a starting point and validates it before saving. Weekly availability uses comma-separated `day=HH:MM-HH:MM` windows, such as `mon=09:00-17:00, tue=09:00-17:00`; use `mon` through `sun` or full weekday names, and repeat a day for split shifts.
-- `o`: run an explicit SolverForge optimization batch
-- `a`: apply the reviewed proposal
+![Keybinding help overlay](assets/screenshot-help.png)
 
-Planner tasks are separate from events: `/` and `c` retain their existing event workflows. Configure availability in the Planner Inbox with `s` before the first batch. Google calendars remain explicit: sync them first, then optimize.
+### Everything stays consistent
 
-### Google Management
+The TUI, the CLI, `.ics` import, and Google sync all route event changes
+through one shared validation and timezone layer. A time is a wall-clock time
+in your timezone — the same event reads the same whether you created it in the
+TUI, imported it from an `.ics` file, or pulled it from Google.
 
-- `r`: refresh discoverable calendars
-- `i` / `Enter`: import the selected discoverable Google calendar
-- `l`: login or reconnect
-- `o`: logout
-- `s`: sync now
+## AI planning: the Planner Inbox
 
-## CLI Automation
+Most calendars only remember what you already scheduled. The Planner Inbox is
+for the other kind of work: the things you know you need to do, but that don't
+have a time yet.
 
-`solverforge-calendar-cli` is the non-interactive automation contract. Successful commands write JSON to stdout, failures write JSON to stderr, and there are no prompts or interactive confirmations.
+You add tasks ("Draft Q4 roadmap, about two hours, needs my best focus,
+deadline Friday"), and the built-in constraint solver figures out *when* they
+should happen. It works like a scheduling assistant that reads your real
+calendar and hands you a plan — which you approve before anything changes.
+
+![Planner Inbox with unscheduled tasks](assets/screenshot-planner-inbox.png)
+
+### The workflow
+
+1. **Add tasks** — press `p` to open the inbox, then `n`. Give each task a
+   duration, a priority (`low` / `normal` / `high`), and optionally a cognitive
+   load (`low` / `medium` / `high`), an earliest start, and a deadline.
+2. **Tell it your week** — press `s` to set your timezone, your working hours
+   (e.g. `mon=09:00-17:00`, split shifts allowed), and — if you want — the
+   windows in which you do your best deep work.
+3. **Optimize** — press `o`. The solver runs for a few seconds and produces a
+   proposal: concrete slots for every task it could place.
+4. **Review** — read the proposal. Check the times. Nothing has happened yet.
+5. **Apply** — press `a` (or `planner proposals apply` in the CLI). Only now
+   do the tasks become real events on your calendar.
+
+![Reviewed proposal ready to apply](assets/screenshot-planner-proposal.png)
+
+### What the planner respects
+
+- **Your existing events are busy time.** Every active calendar counts — the
+  planner will never double-book you.
+- **Availability windows always win.** Work only lands inside the hours you
+  declared, in your timezone.
+- **Deadlines matter.** Hard deadlines are honored; soft deadlines are
+  weighted. Priorities decide who gets the scarce slots.
+- **Deep work is a preference, not a tyranny.** High-cognitive-load tasks are
+  steered toward your focus windows, with streak limits and recovery breaks so
+  you don't get four hours of back-to-back hard thinking. These preferences
+  bend; your availability and deadlines never do.
+
+### You stay in control
+
+- **Proposals change nothing.** Until you apply, your calendar is untouched.
+  A stale proposal (inbox changed since optimizing) is refused — re-optimize
+  and review the fresh one.
+- **Applied tasks are pinned.** If a scheduled task turns out to be wrong,
+  `return-to-inbox` removes exactly that task's event — nothing else.
+- **Sync stays explicit.** If you use Google calendars, the planner requires
+  one successful sync first (so it plans around reality), and applying a
+  proposal never auto-syncs. You always pull the trigger.
+
+The same workflow exists in the CLI — see the
+[planner commands](#automating-and-scripting) — which is also how agents drive
+the planner for you.
+
+## Google Calendar sync
+
+SolverForge Calendar can work alongside your existing Google Calendars with
+conflict-aware two-way sync.
+
+Setup, once:
+
+1. Create Google OAuth credentials of type `Desktop app` and enable the
+   Google Calendar API for that project.
+2. In the TUI press `G` (or run `google auth login` in the CLI).
+3. Your system browser opens; SolverForge validates the OAuth round trip
+   (PKCE `S256`, random loopback port) and stores the refresh token in your OS
+   keyring — never in a config file.
+4. Discover and import the calendars you want. Read-only Google calendars can
+   be imported but reject local edits.
+
+Behavior you can rely on:
+
+- **Sync only happens when you ask.** Press `S` (or `google sync`) — the app
+  never syncs on startup or in the background on its own.
+- **Conflicts are detected, not overwritten.** ETag-based conflict detection
+  means concurrent edits surface as explicit conflicts you resolve in the CLI
+  (`keep-local` or `keep-remote`), and outbound changes travel through a queue
+  you can inspect.
+- **What syncs:** single events, all-day events, title, description, location,
+  start/end, and recurring master RRULE values. Detached recurrence
+  exceptions, attendee editing, attachments, and conference-data creation are
+  not supported yet.
+
+## `.ics` import and export
+
+Moving from another calendar? Press `i` (or `ical import` in the CLI) to
+import `.ics` files: title, description, location, start/end, all-day flags,
+and RRULE recurrence come across; anything unsupported is reported as a
+warning instead of being silently dropped. Floating timestamps default to your
+local timezone unless the file specifies `TZID`.
+
+Press `x` to export everything currently visible to `~/solverforge-calendar.ics`.
+
+## Automating and scripting
+
+Every feature is exposed through `solverforge-calendar-cli`, a
+non-interactive CLI that speaks JSON on stdout (success) and stderr (failure)
+with no prompts. It is the stable contract used by scripts, cron jobs, and AI
+agents.
 
 ```bash
 # Calendars
@@ -126,9 +208,8 @@ cargo run --bin solverforge-calendar-cli -- google conflicts resolve <conflict-i
 cargo run --bin solverforge-calendar-cli -- ical import \
   --calendar-id <calendar-id> \
   --path ./sample.ics
-```
 
-# Planner inbox and SolverForge proposals
+# Planner: configure, add tasks, optimize, review, apply
 cargo run --bin solverforge-calendar-cli -- planner settings update \
   --timezone Europe/Rome \
   --availability mon=09:00-17:00 \
@@ -142,13 +223,21 @@ cargo run --bin solverforge-calendar-cli -- planner proposals list
 cargo run --bin solverforge-calendar-cli -- planner proposals apply <proposal-id>
 ```
 
-Planner behavior:
+Command groups:
 
-- All active calendars are busy-time constraints; writable target calendar selection remains explicit per task.
-- A proposal changes nothing until `planner proposals apply` is run.
-- Cognitive windows and high-load streaks are soft preferences. They never override availability, precedence, or hard deadlines.
-- Applied planner tasks remain fixed. `tasks return-to-inbox <task-id>` explicitly deletes only that task's linked event through the normal sync outbox.
-- Active Google calendars require a previously successful explicit sync before optimization. Applying a proposal never auto-syncs.
+- `calendars`: `list`, `get`, `create`, `update`, `delete`
+- `projects`: `list`, `get`, `create`, `update`, `delete`
+- `events`: `list`, `get`, `create`, `update`, `delete`
+- `dependencies`: `list`, `get`, `create`, `update`, `delete`
+- `google auth`: `status`, `login`, `logout`
+- `google calendars`: `discover`, `import`
+- `google`: `sync`, `sync-status`, `conflicts list`, `conflicts resolve`
+- `ical`: `import`
+- `tasks`: `list`, `get`, `create`, `update`, `delete`, `return-to-inbox`, `dependencies`
+- `planner settings`: `show`, `update`
+- `planner`: `optimize`, `proposals list`, `proposals get`, `proposals apply`
+
+A stable wrapper for automation lives at `./scripts/solverforge-calendar-cli`.
 
 ### Agent skill
 
@@ -170,47 +259,7 @@ checkout):
 
 Restart the agent after installing so it rescans skills.
 
-Available groups:
-
-- `calendars`: `list`, `get`, `create`, `update`, `delete`
-- `projects`: `list`, `get`, `create`, `update`, `delete`
-- `events`: `list`, `get`, `create`, `update`, `delete`
-- `dependencies`: `list`, `get`, `create`, `update`, `delete`
-- `google auth`: `status`, `login`, `logout`
-- `google calendars`: `discover`, `import`
-- `google`: `sync`, `sync-status`, `conflicts list`, `conflicts resolve`
-- `ical`: `import`
-- `tasks`: `list`, `get`, `create`, `update`, `delete`, `return-to-inbox`, `dependencies`
-- `planner settings`: `show`, `update`
-- `planner`: `optimize`, `proposals list`, `proposals get`, `proposals apply`
-
-## Google Calendar Setup
-
-1. Create Google OAuth credentials of type `Desktop app`.
-2. Enable the Google Calendar API for that project.
-3. In the TUI press `G`, or run `google auth login` in the CLI.
-4. SolverForge opens the system browser, uses a random loopback callback port, validates `state`, and uses PKCE `S256`.
-5. The refresh token is stored in the OS keyring under the `solverforge-calendar` service.
-
-Current Google behavior:
-
-- OAuth uses the full `https://www.googleapis.com/auth/calendar` scope so one credential set can cover discovery plus writable event sync safely.
-- Outbound Google writes use `sendUpdates=all`.
-- Read-only Google calendars can be imported but reject local edits.
-- Supported two-way sync scope: single events, all-day events, title, description, location, start/end, and recurring master RRULE values.
-- Detached recurring exceptions, attendee editing, attachments, and conference-data creation are not supported yet.
-- Auto-sync is explicit only. The app does not sync automatically on startup.
-
-## `.ics` Import Scope
-
-`.ics` import now works in both the CLI and the TUI.
-
-- Imported fields: title, description, location, start/end, all-day flag, and RRULE
-- Floating timestamps default to the local system timezone unless a `TZID` is present
-- Unsupported shapes are reported as warnings instead of being silently ignored
-- Recurrence exceptions such as `RECURRENCE-ID`, `RDATE`, and `EXDATE` are skipped for now
-
-## Developer Workflow
+## Contributing
 
 ```bash
 make build
@@ -222,30 +271,7 @@ make ci-local
 make pre-release
 ```
 
-Contributor and automation guidance lives in [AGENT.md](AGENT.md). Product scope and implementation references live in [PRD.md](PRD.md). UI and CLI structure references live in [docs/wireframes/tui.md](docs/wireframes/tui.md) and [docs/wireframes/cli.md](docs/wireframes/cli.md).
-
-## Architecture
-
-- `src/app.rs` + `src/app/`: stable TUI facade with focused state, input, navigation, form, planner, integration, and worker-result modules
-- `src/cli.rs` + `src/cli/`: stable non-interactive CLI facade with typed arguments, handlers, runtime, validation, and Google backend modules
-- `src/event_service.rs` + `src/event_service/`: shared event facade with validation, mutation, and tests
-- `src/calendar_service.rs` + `src/calendar_service/`: shared calendar facade with validation, mutation, and tests
-- `src/ical.rs` + `src/ical/`: `.ics` facade with parsing, candidate, time, import/export, and test modules
-- `src/google/auth.rs` + `src/google/auth/`: desktop OAuth facade with client, OAuth callback, keyring, and test modules
-- `src/google/discovery.rs`: Google calendar discovery
-- `src/google/events_api.rs`: typed Google Calendar event HTTP adapter
-- `src/google/types.rs` + `src/google/types/`: Google payload mapping, event body generation, and tests
-- `src/sync/engine.rs`: sync orchestration and status reporting
-- `src/sync/pull.rs`: incremental inbound sync with `syncToken` recovery
-- `src/sync/push.rs`, `src/sync/conflicts.rs`, and `src/sync/state.rs`, with matching directories: focused outbound, conflict, and persistence modules
-- `src/db.rs` + `src/db/`: database facade with schema migration, CRUD, sync, and test modules
-- `src/planner.rs` + `src/planner/`: planner facade with settings, task, availability, optimization, proposal, and test modules
-- `src/models.rs` + `src/models/`: stable domain-model facade split by data family
-- `tests/cli.rs` + `tests/cli/`: binary-level CLI integration coverage split by command family
-
-Every tracked Rust source and test file stays below 300 lines. Public root module paths remain stable; comments move with the code they document.
-
-## Development
+Or straight cargo:
 
 ```bash
 cargo build           # debug
@@ -254,6 +280,19 @@ cargo build --bins    # both binaries
 cargo check           # fast type check
 cargo clippy          # lint
 cargo test            # run tests
-make ci-local         # local CI simulation
-make pre-release      # release-oriented validation
 ```
+
+Contributor and automation guidance lives in [AGENT.md](AGENT.md). Product
+scope and implementation references live in [PRD.md](PRD.md). UI and CLI
+structure references live in [docs/wireframes/tui.md](docs/wireframes/tui.md)
+and [docs/wireframes/cli.md](docs/wireframes/cli.md).
+
+### Architecture map
+
+For contributors navigating the code: `src/app.rs` + `src/app/` is the TUI
+facade, `src/cli.rs` + `src/cli/` the CLI facade, and `src/event_service.rs`,
+`src/calendar_service.rs`, `src/ical.rs`, `src/google/`, `src/sync/`,
+`src/db.rs`, `src/planner.rs`, and `src/models.rs` hold the shared services
+behind them, each split into focused submodules. `tests/cli.rs` +
+`tests/cli/` covers the CLI at the binary level. Every tracked Rust source and
+test file stays below 300 lines; public root module paths remain stable.
