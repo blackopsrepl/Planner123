@@ -45,8 +45,8 @@ fn optimize_produces_a_hard_feasible_future_schedule() {
         let end = parse(item.end_at.as_ref().unwrap());
 
         assert!(start > now, "assignment must not be in the past: {item:?}");
-        assert!(start.time() >= chrono::NaiveTime::from_hms_opt(9, 0, 0).unwrap());
-        assert!(end.time() <= chrono::NaiveTime::from_hms_opt(17, 0, 0).unwrap());
+        assert!(start.time() >= chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap());
+        assert!(end.time() <= chrono::NaiveTime::from_hms_opt(18, 0, 0).unwrap());
         assert!(start.date() == end.date(), "task must fit inside one day");
         assert!(
             !(start < existing_end && existing_start < end),

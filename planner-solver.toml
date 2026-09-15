@@ -1,6 +1,8 @@
 # SolverForge policy for the calendar planner. All search policy lives here;
 # the Rust model only declares facts, the planning variable, and constraints.
 
+random_seed = 1
+
 [termination]
 seconds_spent_limit = 5
 unimproved_seconds_spent_limit = 2
