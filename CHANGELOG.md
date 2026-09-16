@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.5.0](///compare/v0.4.0...v0.5.0) (2026-09-16)
+
+
+### Features
+
+* **agent:** add portable agent skill with installer f628994
+
+
+### Bug Fixes
+
+* **planner:** bound lateness above the slot grid edge c2274f3
+* **planner:** enforce unified recovery thresholds 0788b44
+* **planner:** keep horizon overrides applicable ac0e1b8
+* **planner:** make proposal penalties exact and additive b8fdb58
+* **planner:** migrate legacy proposal diagnostics safely 5098964
+* **planner:** preserve assignment over deadline lateness dace2c0
+* **planner:** reach the whole horizon when availability is sparse eec9443
+* **planner:** reject unsafe scoring ranges dcaa50e
+* **planner:** require assigned dependency predecessors 82289d3
+* **planner:** restore applied dependency conflicts and blocker evidence 716242c
+* **planner:** restore deadline and recovery semantics faec51d
+
 ## [0.4.0](///compare/v0.3.0...v0.4.0) (2026-09-02)
 
 
