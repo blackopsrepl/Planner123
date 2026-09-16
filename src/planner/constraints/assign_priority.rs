@@ -25,11 +25,7 @@ pub(crate) fn scale_assignment_penalties(
     tasks: &mut [SolverTask],
     horizon_end: DateTime<Utc>,
 ) -> Result<(), PlannerError> {
-    let max_total_lateness: i128 = tasks
-        .iter()
-        .filter_map(|task| task.soft_deadline)
-        .map(|deadline| i128::from((horizon_end - deadline).num_minutes().max(0)))
-        .sum();
+    let max_total_lateness = max_lateness_bound(tasks, horizon_end);
     let scale = max_total_lateness + 1;
     let scaled: Vec<i128> = tasks
         .iter()
@@ -45,6 +41,20 @@ pub(crate) fn scale_assignment_penalties(
         task.priority_weight = penalty as i64;
     }
     Ok(())
+}
+
+/// Upper bound on total soft-deadline lateness. A task may start in the last
+/// candidate slot before the horizon end and run for its whole duration, so
+/// each bound includes that duration; no assignment can exceed it.
+fn max_lateness_bound(tasks: &[SolverTask], horizon_end: DateTime<Utc>) -> i128 {
+    tasks
+        .iter()
+        .filter_map(|task| {
+            task.soft_deadline.map(|deadline| {
+                i128::from((horizon_end - deadline).num_minutes().max(0) + task.duration_minutes)
+            })
+        })
+        .sum()
 }
 
 #[cfg(test)]
@@ -77,5 +87,21 @@ mod tests {
     fn assigned_task_scores_zero() {
         let score = (constraint(),).evaluate_all(&plan(7, true));
         assert_eq!(score, HardMediumSoftScore::ZERO);
+    }
+
+    #[test]
+    fn scaling_keeps_a_single_assignment_above_any_lateness_total() {
+        let horizon_end = crate::planner_domain::test_support::origin() + chrono::Duration::days(2);
+        let mut tasks = vec![
+            crate::planner_domain::test_support::task(1, 60),
+            crate::planner_domain::test_support::task(1, 60),
+        ];
+        tasks[0].soft_deadline = Some(crate::planner_domain::test_support::origin());
+        tasks[1].soft_deadline = Some(crate::planner_domain::test_support::origin());
+        let bound = max_lateness_bound(&tasks, horizon_end);
+        scale_assignment_penalties(&mut tasks, horizon_end).unwrap();
+        // Every possible lateness total is strictly below one scaled point.
+        assert!(bound < i128::from(tasks[0].priority_weight));
+        assert!(bound < i128::from(tasks[1].priority_weight));
     }
 }
