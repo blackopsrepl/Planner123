@@ -25,6 +25,19 @@ fn proposal_becomes_stale_when_settings_change() {
 }
 
 #[test]
+fn horizon_override_proposal_remains_ready_and_can_be_applied() {
+    let (_temp, conn, calendar_id) = connection();
+    configure_utc_workweek(&conn);
+    create_task(&conn, task(calendar_id, "Short-horizon task")).unwrap();
+
+    let proposal = optimize(&conn, Some(2)).unwrap();
+    assert_eq!(proposal.proposal.horizon_days, 2);
+    let applicability = proposal_applicability(&conn, &proposal.proposal.id).unwrap();
+    assert!(applicability.can_apply, "{:?}", applicability.reasons);
+    apply_proposal(&conn, &proposal.proposal.id).unwrap();
+}
+
+#[test]
 fn proposal_becomes_stale_when_dependencies_change() {
     let (_temp, conn, calendar_id) = connection();
     configure_utc_workweek(&conn);

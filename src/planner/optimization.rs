@@ -8,7 +8,8 @@ pub fn optimize(
     conn: &Connection,
     horizon_days: Option<i64>,
 ) -> Result<ProposalDetail, PlannerError> {
-    let mut settings = settings(conn)?;
+    let persisted_settings = settings(conn)?;
+    let mut settings = persisted_settings.clone();
     if let Some(days) = horizon_days {
         settings.horizon_days = days;
     }
@@ -64,7 +65,7 @@ pub fn optimize(
         .ok_or_else(|| {
             PlannerError::Validation("the planner horizon produced no candidate slots".into())
         })?;
-    let snapshot = proposal_snapshot(conn, &settings)?;
+    let snapshot = proposal_snapshot(conn, &persisted_settings)?;
     let proposal = PlannerProposal {
         id: proposal_id.clone(),
         status: "ready".into(),
