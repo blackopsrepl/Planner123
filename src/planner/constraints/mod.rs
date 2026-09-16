@@ -12,6 +12,7 @@ pub(crate) use self::assign_priority::scale_assignment_penalties;
 pub(crate) use self::cognitive_window::minutes_outside;
 pub(crate) use self::high_load_recovery::recovery_penalty;
 pub(crate) use self::inside_availability::fully_covered;
+pub(crate) use self::score_bounds::validate_soft_score_range;
 pub(crate) use self::support::TaskInterval;
 
 /// Constraint names shared by rule registration and score-analysis lookups so
@@ -35,6 +36,7 @@ mod inside_availability;
 mod soft_deadline;
 mod cognitive_window;
 mod high_load_recovery;
+mod score_bounds;
 
 mod assemble {
     use super::*;

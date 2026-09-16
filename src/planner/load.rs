@@ -6,7 +6,7 @@
 //! intervals, and task entities. Every rule that decides legality or quality
 //! lives in `crate::planner::constraints`.
 
-use super::constraints::scale_assignment_penalties;
+use super::constraints::{scale_assignment_penalties, validate_soft_score_range};
 use super::*;
 
 /// Everything the loader needs from the database, already validated.
@@ -67,15 +67,19 @@ pub(super) fn build_plan(
         .collect();
     let applied = applied_blocks(conn, inputs.tasks, &dependencies)?;
     let applied_ends = applied_recovery_ends(&applied);
+    let availability = availability_facts(inputs.availability)?;
+    let cognitive = cognitive_facts(settings)?;
+    let tasks = build_tasks(inputs, now, horizon_end, &dependency_map, &applied_ends)?;
+    validate_soft_score_range(&tasks, &cognitive)?;
 
     Ok(BuiltPlan {
         plan: SolverPlan::new(
             slots,
             busy,
             applied,
-            availability_facts(inputs.availability)?,
-            cognitive_facts(settings)?,
-            build_tasks(inputs, now, horizon_end, &dependency_map, &applied_ends)?,
+            availability,
+            cognitive,
+            tasks,
             settings.solve_seconds as u64,
         ),
         horizon_end,

@@ -1,5 +1,7 @@
 use super::*;
 
+const MAX_TASK_DURATION_MINUTES: i64 = 23 * 60 + 59;
+
 pub(super) fn validate_task_input(
     conn: &Connection,
     input: &CreateTaskInput,
@@ -7,9 +9,9 @@ pub(super) fn validate_task_input(
     if input.title.trim().is_empty() {
         return Err(PlannerError::Validation("title cannot be empty".into()));
     }
-    if input.duration_minutes <= 0 {
+    if !(1..=MAX_TASK_DURATION_MINUTES).contains(&input.duration_minutes) {
         return Err(PlannerError::Validation(
-            "duration_minutes must be positive".into(),
+            "duration_minutes must be between 1 and 1439".into(),
         ));
     }
     let calendar = db::get_calendar(conn, &input.target_calendar_id)

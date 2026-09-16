@@ -79,3 +79,38 @@ fn priority_weights_must_be_positive_and_ordered() {
         );
     }
 }
+
+#[test]
+fn task_duration_is_bounded_to_a_supported_same_day_interval() {
+    let (_temp, conn, calendar_id) = connection();
+    let mut input = task(calendar_id, "Too long");
+    input.duration_minutes = 1440;
+    assert_eq!(
+        create_task(&conn, input).unwrap_err().to_string(),
+        "duration_minutes must be between 1 and 1439"
+    );
+}
+
+#[test]
+fn optimizer_rejects_soft_score_overflow_before_solving() {
+    let (_temp, conn, calendar_id) = connection();
+    configure_utc_workweek(&conn);
+    update_settings(
+        &conn,
+        SettingsUpdate {
+            cognitive_enabled: Some(true),
+            high_outside_penalty: Some(i64::MAX),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut input = task(calendar_id, "Overflowing score");
+    input.duration_minutes = 1439;
+    input.cognitive_load = CognitiveLoad::High;
+    create_task(&conn, input).unwrap();
+
+    assert_eq!(
+        optimize(&conn, None).unwrap_err().to_string(),
+        "planner cognitive and recovery weights exceed the supported score range"
+    );
+}
