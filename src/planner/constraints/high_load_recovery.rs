@@ -1,4 +1,5 @@
-use crate::planner_domain::{SolverPlan, SolverTask};
+use super::support::{task_row, TimelineRow};
+use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -8,17 +9,30 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
         .join((
-            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::tasks()),
-            |left: &SolverTask, right: &SolverTask| {
-                left.index < right.index
-                    && left.is_high()
-                    && right.is_high()
-                    && matches!(left.gap_between(right), Some(gap) if gap < left.recovery_minutes)
-            },
+            SolverPlan::slots(),
+            joiner::equal_bi(
+                |task: &SolverTask| task.start_idx,
+                |slot: &SolverSlot| Some(slot.id),
+            ),
         ))
-        .penalize(|left: &SolverTask, _right: &SolverTask| {
-            HardMediumSoftScore::of_soft(left.excess_high_penalty)
+        .project(task_row)
+        .join(joiner::equal(|_: &TimelineRow| ()))
+        .filter(
+            |left: &TimelineRow, right: &TimelineRow| match (left, right) {
+                (TimelineRow::Task(left), TimelineRow::Task(right)) => {
+                    left.is_high()
+                        && right.is_high()
+                        && left.gap(right.start, right.end) < left.recovery_minutes
+                }
+                _ => false,
+            },
+        )
+        .penalize(|left: &TimelineRow, right: &TimelineRow| {
+            let penalty = match (left, right) {
+                (TimelineRow::Task(left), TimelineRow::Task(_)) => left.excess_high_penalty,
+                _ => 0,
+            };
+            HardMediumSoftScore::of_soft(penalty)
         })
         .named("High cognitive-load recovery")
 }

@@ -2900,7 +2900,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "solverforge",
- "solverforge-core",
  "tempfile",
  "tokio",
  "toml 0.8.23",

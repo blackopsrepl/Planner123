@@ -1,4 +1,5 @@
-use crate::planner_domain::{SolverPlan, SolverTask};
+use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
+use chrono::Duration;
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -6,14 +7,24 @@ use solverforge::IncrementalConstraint;
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
-        .filter(|task: &SolverTask| late_minutes(task) > 0)
-        .penalize(|task: &SolverTask| HardMediumSoftScore::of_soft(late_minutes(task)))
+        .join((
+            SolverPlan::slots(),
+            joiner::equal_bi(
+                |task: &SolverTask| task.start_idx,
+                |slot: &SolverSlot| Some(slot.id),
+            ),
+        ))
+        .filter(|task: &SolverTask, slot: &SolverSlot| late_minutes(task, slot) > 0)
+        .penalize(|task: &SolverTask, slot: &SolverSlot| {
+            HardMediumSoftScore::of_soft(late_minutes(task, slot))
+        })
         .named("Prefer soft deadlines")
 }
 
-fn late_minutes(task: &SolverTask) -> i64 {
-    match (task.end(), task.soft_deadline) {
-        (Some(end), Some(deadline)) if end > deadline => (end - deadline).num_minutes(),
+fn late_minutes(task: &SolverTask, slot: &SolverSlot) -> i64 {
+    let end = slot.start + Duration::minutes(task.duration_minutes);
+    match task.soft_deadline {
+        Some(deadline) if end > deadline => (end - deadline).num_minutes(),
         _ => 0,
     }
 }
@@ -21,14 +32,13 @@ fn late_minutes(task: &SolverTask) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::planner_domain::test_support::{slots, task};
-    use chrono::Duration;
+    use crate::planner_domain::test_support::{origin, slots, task};
     use solverforge::ConstraintSet;
 
     fn plan(start_idx: Option<usize>, deadline_offset_minutes: i64) -> SolverPlan {
         let mut task = task(3, 60);
         task.start_idx = start_idx;
-        task.soft_deadline = Some(task.horizon_origin + Duration::minutes(deadline_offset_minutes));
+        task.soft_deadline = Some(origin() + Duration::minutes(deadline_offset_minutes));
         SolverPlan::new(slots(8), vec![], vec![], vec![], vec![task], 1)
     }
 

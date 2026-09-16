@@ -1,4 +1,5 @@
-use crate::planner_domain::{SolverPlan, SolverTask};
+use super::support::{task_row, TimelineRow};
+use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -7,18 +8,24 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
         .join((
-            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::tasks()),
-            |successor: &SolverTask, predecessor: &SolverTask| {
-                successor.index != predecessor.index
-                    && successor.depends_on.contains(&predecessor.index)
-                    && matches!(
-                        (successor.start(), predecessor.end()),
-                        (Some(start), Some(end)) if start < end
-                    )
-            },
+            SolverPlan::slots(),
+            joiner::equal_bi(
+                |task: &SolverTask| task.start_idx,
+                |slot: &SolverSlot| Some(slot.id),
+            ),
         ))
-        .penalize(hard_weight(|_: &SolverTask, _: &SolverTask| {
+        .project(task_row)
+        .join(joiner::equal(|_: &TimelineRow| ()))
+        .filter(
+            |left: &TimelineRow, right: &TimelineRow| match (left, right) {
+                (TimelineRow::Task(left), TimelineRow::Task(right)) => {
+                    (left.depends_on.contains(&right.index) && left.start < right.end)
+                        || (right.depends_on.contains(&left.index) && right.start < left.end)
+                }
+                _ => false,
+            },
+        )
+        .penalize(hard_weight(|_: &TimelineRow, _: &TimelineRow| {
             HardMediumSoftScore::of_hard(1)
         }))
         .named("Respect task dependencies")

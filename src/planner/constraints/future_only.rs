@@ -1,4 +1,4 @@
-use crate::planner_domain::{SolverPlan, SolverTask};
+use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -6,8 +6,15 @@ use solverforge::IncrementalConstraint;
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
-        .filter(|task: &SolverTask| task.start().is_some_and(|start| start < task.not_before))
-        .penalize(hard_weight(|_: &SolverTask| {
+        .join((
+            SolverPlan::slots(),
+            joiner::equal_bi(
+                |task: &SolverTask| task.start_idx,
+                |slot: &SolverSlot| Some(slot.id),
+            ),
+        ))
+        .filter(|task: &SolverTask, slot: &SolverSlot| slot.start < task.not_before)
+        .penalize(hard_weight(|_: &SolverTask, _: &SolverSlot| {
             HardMediumSoftScore::of_hard(1)
         }))
         .named("Never schedule in the past")
@@ -16,14 +23,14 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::planner_domain::test_support::{slots, task};
+    use crate::planner_domain::test_support::{origin, slots, task};
     use chrono::Duration;
     use solverforge::ConstraintSet;
 
     fn plan(start_idx: Option<usize>, not_before_offset_minutes: i64) -> SolverPlan {
         let mut task = task(3, 60);
         task.start_idx = start_idx;
-        task.not_before = task.horizon_origin + Duration::minutes(not_before_offset_minutes);
+        task.not_before = origin() + Duration::minutes(not_before_offset_minutes);
         SolverPlan::new(slots(8), vec![], vec![], vec![], vec![task], 1)
     }
 

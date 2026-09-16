@@ -2,9 +2,7 @@ use super::*;
 
 use std::collections::BTreeMap;
 
-use solverforge::ConstraintSet;
-
-use crate::planner::constraints::create_constraints;
+use solverforge::{Analyzable, HardMediumSoftScore, ScoreAnalysis};
 
 /// Runs one optimization and persists a proposal. Nothing else is mutated.
 pub fn optimize(
@@ -133,34 +131,42 @@ pub fn optimize(
 struct TaskPenalties {
     cognitive: i64,
     fatigue: i64,
-    constraints: Vec<String>,
 }
 
 fn task_penalties(plan: &SolverPlan) -> BTreeMap<usize, TaskPenalties> {
-    let constraints = create_constraints();
-    let analyses = constraints.evaluate_detailed(plan);
+    let baseline = plan.analyze();
     let mut map: BTreeMap<usize, TaskPenalties> = BTreeMap::new();
-    for analysis in &analyses {
-        let name = analysis.name().to_string();
-        for matched in &analysis.matches {
-            let amount = -matched.score.soft();
-            for entity in &matched.justification.entities {
-                let Some(task) = entity.as_entity::<SolverTask>() else {
-                    continue;
-                };
-                let entry = map.entry(task.index).or_default();
-                if name.contains("cognitive windows") {
-                    entry.cognitive += amount;
-                } else if name.contains("recovery") {
-                    entry.fatigue += amount;
-                }
-                if !entry.constraints.contains(&name) {
-                    entry.constraints.push(name.clone());
-                }
-            }
+    for task in plan.tasks.iter().filter(|task| task.start_idx.is_some()) {
+        let mut without = plan.clone();
+        without.tasks[task.index].start_idx = None;
+        let counterfactual = without.analyze();
+        let cognitive = contribution(&baseline, &counterfactual, "Prefer cognitive windows");
+        let fatigue = contribution(&baseline, &counterfactual, "High cognitive-load recovery")
+            + contribution(
+                &baseline,
+                &counterfactual,
+                "Applied high cognitive-load recovery",
+            );
+        if cognitive > 0 || fatigue > 0 {
+            map.insert(task.index, TaskPenalties { cognitive, fatigue });
         }
     }
     map
+}
+
+fn contribution(
+    baseline: &ScoreAnalysis<HardMediumSoftScore>,
+    counterfactual: &ScoreAnalysis<HardMediumSoftScore>,
+    name: &str,
+) -> i64 {
+    let soft = |analysis: &ScoreAnalysis<HardMediumSoftScore>| {
+        analysis
+            .constraints
+            .iter()
+            .find(|constraint| constraint.name == name)
+            .map_or(0, |constraint| constraint.score.soft())
+    };
+    (soft(counterfactual) - soft(baseline)).max(0)
 }
 
 fn explanation(scheduled: bool, entry: &TaskPenalties) -> Option<String> {

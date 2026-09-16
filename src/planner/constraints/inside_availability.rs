@@ -1,174 +1,135 @@
-use crate::planner_domain::{SolverAvailability, SolverPlan, SolverTask};
+use super::support::{clock_contains, task_row, AvailabilityRows, TaskInterval, TimelineRow};
+use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use chrono::{Datelike, Duration};
 use solverforge::prelude::*;
-use solverforge::{IncrementalConstraint, IncrementalConstraintSealed};
-use solverforge_core::ConstraintRef;
+use solverforge::IncrementalConstraint;
 
-/// HARD: every assigned minute must fall inside some weekly availability
-/// window.
-///
-/// Coverage needs "no window contains this minute", a negated existence the
-/// fluent keyed-existence API cannot express, so this rule is a small custom
-/// `IncrementalConstraint` over the raw availability facts. Availability stays
-/// data; the rule lives here and nowhere else.
-pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
-    AvailabilityConstraint::new()
+/// HARD: charge one point for every assigned minute. The coverage constraint
+/// refunds exactly the minutes contained by the availability union.
+pub fn required() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
+    ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
+        .for_each(SolverPlan::tasks())
+        .filter(|task: &SolverTask| task.start_idx.is_some())
+        .penalize(hard_weight(|task: &SolverTask| {
+            HardMediumSoftScore::of_hard(task.duration_minutes.max(1))
+        }))
+        .named("Require available minutes")
 }
 
-struct AvailabilityConstraint {
-    constraint_ref: ConstraintRef,
-    last_score: HardMediumSoftScore,
+/// HARD: refund assigned minutes covered by canonical disjoint availability
+/// facts. A fully covered task nets to zero across the two availability rules.
+pub fn covered() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
+    ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
+        .for_each(SolverPlan::tasks())
+        .join((
+            SolverPlan::slots(),
+            joiner::equal_bi(
+                |task: &SolverTask| task.start_idx,
+                |slot: &SolverSlot| Some(slot.id),
+            ),
+        ))
+        .project(task_row)
+        .merge(
+            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
+                .for_each(SolverPlan::availability())
+                .project(AvailabilityRows),
+        )
+        .join(joiner::equal(|_: &TimelineRow| ()))
+        .filter(|left: &TimelineRow, right: &TimelineRow| covered_minutes(left, right) > 0)
+        .reward(hard_weight(|left: &TimelineRow, right: &TimelineRow| {
+            HardMediumSoftScore::of_hard(covered_minutes(left, right))
+        }))
+        .named("Cover available minutes")
 }
 
-impl AvailabilityConstraint {
-    fn new() -> Self {
-        Self {
-            constraint_ref: ConstraintRef::new("", "Inside availability"),
-            last_score: HardMediumSoftScore::ZERO,
-        }
-    }
-
-    fn score_for(plan: &SolverPlan) -> HardMediumSoftScore {
-        HardMediumSoftScore::of_hard(-(violations(plan) as i64))
-    }
-}
-
-fn violations(plan: &SolverPlan) -> usize {
-    plan.tasks
-        .iter()
-        .filter(|task| violates(task, &plan.availability))
-        .count()
-}
-
-fn violates(task: &SolverTask, windows: &[SolverAvailability]) -> bool {
-    let (Some(start), Some(end)) = (task.local_start(), task.local_end()) else {
-        return false;
-    };
-    if start >= end {
-        return true;
-    }
-    let mut cursor = start;
-    while cursor < end {
-        let weekday = cursor.weekday().num_days_from_monday();
-        let covered = windows.iter().any(|window| {
-            window.weekday == weekday && clock_contains(cursor.time(), window.start, window.end)
-        });
-        if !covered {
-            return true;
-        }
-        cursor += Duration::minutes(1);
-    }
-    false
-}
-
-fn clock_contains(
-    value: chrono::NaiveTime,
-    start: chrono::NaiveTime,
-    end: chrono::NaiveTime,
-) -> bool {
-    if start == end {
-        return true;
-    }
-    if start < end {
-        value >= start && value < end
-    } else {
-        value >= start || value < end
+fn covered_minutes(left: &TimelineRow, right: &TimelineRow) -> i64 {
+    match (left, right) {
+        (
+            TimelineRow::Task(task),
+            TimelineRow::Availability {
+                weekday,
+                start,
+                end,
+            },
+        )
+        | (
+            TimelineRow::Availability {
+                weekday,
+                start,
+                end,
+            },
+            TimelineRow::Task(task),
+        ) => task_covered_minutes(task, *weekday, *start, *end),
+        _ => 0,
     }
 }
 
-impl IncrementalConstraintSealed for AvailabilityConstraint {}
-
-impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> for AvailabilityConstraint {
-    fn evaluate(&self, plan: &SolverPlan) -> HardMediumSoftScore {
-        Self::score_for(plan)
-    }
-
-    fn match_count(&self, plan: &SolverPlan) -> usize {
-        violations(plan)
-    }
-
-    fn initialize(&mut self, plan: &SolverPlan) -> HardMediumSoftScore {
-        self.last_score = Self::score_for(plan);
-        self.last_score
-    }
-
-    fn on_insert(
-        &mut self,
-        plan: &SolverPlan,
-        _entity_index: usize,
-        _descriptor_index: usize,
-    ) -> HardMediumSoftScore {
-        let next = Self::score_for(plan);
-        let delta = next - self.last_score;
-        self.last_score = next;
-        delta
-    }
-
-    fn on_retract(
-        &mut self,
-        _plan: &SolverPlan,
-        _entity_index: usize,
-        _descriptor_index: usize,
-    ) -> HardMediumSoftScore {
-        HardMediumSoftScore::ZERO
-    }
-
-    fn reset(&mut self) {
-        self.last_score = HardMediumSoftScore::ZERO;
-    }
-
-    fn constraint_ref(&self) -> &ConstraintRef {
-        &self.constraint_ref
-    }
-
-    fn is_hard(&self) -> bool {
-        true
-    }
+fn task_covered_minutes(
+    task: &TaskInterval,
+    weekday: u32,
+    window_start: chrono::NaiveTime,
+    window_end: chrono::NaiveTime,
+) -> i64 {
+    let duration = (task.end - task.start).num_minutes().max(0);
+    (0..duration)
+        .filter(|offset| {
+            let instant = task.start + Duration::minutes(*offset);
+            let local = instant.with_timezone(&task.timezone);
+            local.weekday().num_days_from_monday() == weekday
+                && clock_contains(local.time(), window_start, window_end)
+        })
+        .count() as i64
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::planner_domain::test_support::{slots, task};
+    use crate::planner_domain::SolverAvailability;
     use chrono::NaiveTime;
     use solverforge::ConstraintSet;
 
-    fn workweek() -> Vec<SolverAvailability> {
-        (0..7)
-            .map(|weekday| SolverAvailability {
-                id: format!("day-{weekday}"),
-                index: weekday as usize,
-                weekday,
-                start: NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
-                end: NaiveTime::from_hms_opt(17, 0, 0).unwrap(),
-            })
-            .collect()
+    fn window(index: usize, start: (u32, u32), end: (u32, u32)) -> SolverAvailability {
+        SolverAvailability {
+            id: format!("window-{index}"),
+            index,
+            weekday: 0,
+            start: NaiveTime::from_hms_opt(start.0, start.1, 0).unwrap(),
+            end: NaiveTime::from_hms_opt(end.0, end.1, 0).unwrap(),
+        }
     }
 
-    fn plan(start_idx: Option<usize>) -> SolverPlan {
+    fn plan(start_idx: Option<usize>, windows: Vec<SolverAvailability>) -> SolverPlan {
         let mut task = task(3, 60);
         task.start_idx = start_idx;
-        SolverPlan::new(slots(48), vec![], workweek(), vec![], vec![task], 1)
+        SolverPlan::new(slots(48), vec![], windows, vec![], vec![task], 1)
+    }
+
+    fn score(plan: &SolverPlan) -> HardMediumSoftScore {
+        (required(), covered()).evaluate_all(plan)
     }
 
     #[test]
-    fn penalizes_assignment_outside_availability() {
-        let score = (constraint(),).evaluate_all(&plan(Some(0)));
-        assert_eq!(score, HardMediumSoftScore::of_hard(-1));
+    fn penalizes_each_unavailable_minute() {
+        assert_eq!(
+            score(&plan(Some(0), vec![window(0, (0, 30), (1, 0))])),
+            HardMediumSoftScore::of_hard(-30)
+        );
     }
 
     #[test]
-    fn allows_assignment_inside_availability() {
-        // 2026-01-05 is a Monday; slot 18 starts at 09:00 UTC.
-        let score = (constraint(),).evaluate_all(&plan(Some(18)));
-        assert_eq!(score, HardMediumSoftScore::ZERO);
+    fn combines_adjacent_windows() {
+        assert_eq!(
+            score(&plan(
+                Some(18),
+                vec![window(0, (9, 0), (9, 30)), window(1, (9, 30), (10, 0))],
+            )),
+            HardMediumSoftScore::ZERO
+        );
     }
 
     #[test]
     fn ignores_unassigned_tasks() {
-        assert_eq!(
-            (constraint(),).evaluate_all(&plan(None)),
-            HardMediumSoftScore::ZERO
-        );
+        assert_eq!(score(&plan(None, Vec::new())), HardMediumSoftScore::ZERO);
     }
 }

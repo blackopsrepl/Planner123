@@ -1,4 +1,5 @@
-use crate::planner_domain::{SolverCognitiveWindow, SolverPlan, SolverTask};
+use super::support::{clock_contains, task_row, CognitiveRows, TaskInterval, TimelineRow};
+use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use chrono::{Duration, NaiveDateTime, NaiveTime};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
@@ -9,34 +10,63 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
         .join((
-            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::cognitive_windows()),
-            solverforge::stream::joiner::equal_bi(
-                |task: &SolverTask| Some(task.load),
-                |window: &SolverCognitiveWindow| Some(window.load),
+            SolverPlan::slots(),
+            joiner::equal_bi(
+                |task: &SolverTask| task.start_idx,
+                |slot: &SolverSlot| Some(slot.id),
             ),
         ))
-        .filter(|task: &SolverTask, window: &SolverCognitiveWindow| {
-            window.outside_penalty > 0 && minutes_outside(task, window) > 0
-        })
-        .penalize(|task: &SolverTask, window: &SolverCognitiveWindow| {
-            HardMediumSoftScore::of_soft(minutes_outside(task, window) * window.outside_penalty)
+        .project(task_row)
+        .merge(
+            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
+                .for_each(SolverPlan::cognitive_windows())
+                .project(CognitiveRows),
+        )
+        .join(joiner::equal(|_: &TimelineRow| ()))
+        .filter(|left: &TimelineRow, right: &TimelineRow| penalty(left, right) > 0)
+        .penalize(|left: &TimelineRow, right: &TimelineRow| {
+            HardMediumSoftScore::of_soft(penalty(left, right))
         })
         .named("Prefer cognitive windows")
 }
 
-fn minutes_outside(task: &SolverTask, window: &SolverCognitiveWindow) -> i64 {
-    let (Some(start), Some(end)) = (task.local_start(), task.local_end()) else {
-        return 0;
-    };
+fn penalty(left: &TimelineRow, right: &TimelineRow) -> i64 {
+    match (left, right) {
+        (
+            TimelineRow::Task(task),
+            TimelineRow::Cognitive {
+                load,
+                start,
+                end,
+                outside_penalty,
+            },
+        )
+        | (
+            TimelineRow::Cognitive {
+                load,
+                start,
+                end,
+                outside_penalty,
+            },
+            TimelineRow::Task(task),
+        ) if task.load == *load && *outside_penalty > 0 => {
+            minutes_outside(task, *start, *end) * *outside_penalty
+        }
+        _ => 0,
+    }
+}
+
+fn minutes_outside(task: &TaskInterval, window_start: NaiveTime, window_end: NaiveTime) -> i64 {
+    let start = task.start.with_timezone(&task.timezone);
+    let end = task.end.with_timezone(&task.timezone);
     if start >= end {
         return 0;
     }
     let total = (end - start).num_minutes();
     if start.date_naive() == end.date_naive() {
         let date = start.date_naive();
-        let window_start = date.and_time(window.start);
-        let window_end = date.and_time(window.end);
+        let window_start = date.and_time(window_start);
+        let window_end = date.and_time(window_end);
         total
             - overlap_minutes(
                 start.naive_local(),
@@ -48,7 +78,7 @@ fn minutes_outside(task: &SolverTask, window: &SolverCognitiveWindow) -> i64 {
         let mut cursor = start;
         let mut outside = 0;
         while cursor < end {
-            if !clock_contains(cursor.time(), window.start, window.end) {
+            if !clock_contains(cursor.time(), window_start, window_end) {
                 outside += 1;
             }
             cursor += Duration::minutes(1);
@@ -72,21 +102,11 @@ fn overlap_minutes(
     }
 }
 
-fn clock_contains(value: NaiveTime, start: NaiveTime, end: NaiveTime) -> bool {
-    if start == end {
-        return true;
-    }
-    if start < end {
-        value >= start && value < end
-    } else {
-        value >= start || value < end
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::planner_domain::test_support::{slots, task};
+    use crate::planner_domain::SolverCognitiveWindow;
     use solverforge::ConstraintSet;
 
     fn window(start: (u32, u32), end: (u32, u32), penalty: i64) -> SolverCognitiveWindow {

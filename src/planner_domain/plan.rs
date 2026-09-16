@@ -91,16 +91,6 @@ mod tests {
     use crate::planner_domain::test_support::{slots, task};
 
     #[test]
-    fn resolved_start_matches_the_owning_slot() {
-        let slots = slots(8);
-        let mut task = task(3, 60);
-        for (index, slot) in slots.iter().enumerate() {
-            task.start_idx = Some(index);
-            assert_eq!(task.start().unwrap(), slot.start);
-        }
-    }
-
-    #[test]
     fn rebuild_filters_out_of_range_assignments() {
         let mut plan = SolverPlan::new(slots(4), vec![], vec![], vec![], vec![task(3, 60)], 1);
         plan.tasks[0].start_idx = Some(99);

@@ -1,4 +1,5 @@
-use crate::planner_domain::{SolverBusy, SolverPlan, SolverTask};
+use super::support::{task_row, BusyRows, TimelineRow};
+use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -8,28 +9,49 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
         .join((
-            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::busy()),
-            |task: &SolverTask, busy: &SolverBusy| {
-                task.is_high()
-                    && busy.high
-                    && matches!(gap_to_block(task, busy), Some(gap) if gap < task.recovery_minutes)
-            },
+            SolverPlan::slots(),
+            joiner::equal_bi(
+                |task: &SolverTask| task.start_idx,
+                |slot: &SolverSlot| Some(slot.id),
+            ),
         ))
-        .penalize(|task: &SolverTask, _busy: &SolverBusy| {
-            HardMediumSoftScore::of_soft(task.excess_high_penalty)
+        .project(task_row)
+        .merge(
+            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
+                .for_each(SolverPlan::busy())
+                .project(BusyRows),
+        )
+        .join(joiner::equal(|_: &TimelineRow| ()))
+        .filter(|left: &TimelineRow, right: &TimelineRow| violates(left, right))
+        .penalize(|left: &TimelineRow, right: &TimelineRow| {
+            HardMediumSoftScore::of_soft(penalty(left, right))
         })
         .named("Applied high cognitive-load recovery")
 }
 
-fn gap_to_block(task: &SolverTask, busy: &SolverBusy) -> Option<i64> {
-    let (start, end) = (task.start()?, task.end()?);
-    if end <= busy.start {
-        Some((busy.start - end).num_minutes())
-    } else if busy.end <= start {
-        Some((start - busy.end).num_minutes())
-    } else {
-        Some(0)
+fn violates(left: &TimelineRow, right: &TimelineRow) -> bool {
+    match (left, right) {
+        (
+            TimelineRow::Task(task),
+            TimelineRow::Busy {
+                start, end, high, ..
+            },
+        )
+        | (
+            TimelineRow::Busy {
+                start, end, high, ..
+            },
+            TimelineRow::Task(task),
+        ) => task.is_high() && *high && task.gap(*start, *end) < task.recovery_minutes,
+        _ => false,
+    }
+}
+
+fn penalty(left: &TimelineRow, right: &TimelineRow) -> i64 {
+    match (left, right) {
+        (TimelineRow::Task(task), TimelineRow::Busy { .. })
+        | (TimelineRow::Busy { .. }, TimelineRow::Task(task)) => task.excess_high_penalty,
+        _ => 0,
     }
 }
 
@@ -37,6 +59,7 @@ fn gap_to_block(task: &SolverTask, busy: &SolverBusy) -> Option<i64> {
 mod tests {
     use super::*;
     use crate::planner_domain::test_support::{origin, slots, task};
+    use crate::planner_domain::SolverBusy;
     use chrono::Duration;
     use solverforge::ConstraintSet;
 

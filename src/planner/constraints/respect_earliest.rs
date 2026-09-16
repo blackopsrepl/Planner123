@@ -1,4 +1,4 @@
-use crate::planner_domain::{SolverPlan, SolverTask};
+use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -6,13 +6,18 @@ use solverforge::IncrementalConstraint;
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
-        .filter(|task: &SolverTask| {
-            matches!(
-                (task.start(), task.earliest_at),
-                (Some(start), Some(earliest)) if start < earliest
-            )
+        .join((
+            SolverPlan::slots(),
+            joiner::equal_bi(
+                |task: &SolverTask| task.start_idx,
+                |slot: &SolverSlot| Some(slot.id),
+            ),
+        ))
+        .filter(|task: &SolverTask, slot: &SolverSlot| {
+            task.earliest_at
+                .is_some_and(|earliest| slot.start < earliest)
         })
-        .penalize(hard_weight(|_: &SolverTask| {
+        .penalize(hard_weight(|_: &SolverTask, _: &SolverSlot| {
             HardMediumSoftScore::of_hard(1)
         }))
         .named("Respect earliest start")
@@ -21,7 +26,7 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::planner_domain::test_support::{slots, task};
+    use crate::planner_domain::test_support::{origin, slots, task};
     use chrono::Duration;
     use solverforge::ConstraintSet;
 
@@ -29,7 +34,7 @@ mod tests {
         let mut task = task(3, 60);
         task.start_idx = start_idx;
         task.earliest_at =
-            earliest_offset_minutes.map(|minutes| task.horizon_origin + Duration::minutes(minutes));
+            earliest_offset_minutes.map(|minutes| origin() + Duration::minutes(minutes));
         SolverPlan::new(slots(8), vec![], vec![], vec![], vec![task], 1)
     }
 

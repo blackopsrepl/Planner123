@@ -53,7 +53,7 @@ pub(super) fn build_plan(
         busy,
         availability_facts(inputs.availability),
         cognitive_facts(settings),
-        build_tasks(inputs, origin, now, &dependency_map)?,
+        build_tasks(inputs, now, &dependency_map)?,
         settings.solve_seconds.max(1) as u64,
     ))
 }
@@ -83,7 +83,6 @@ fn existing_busy(
 
 fn build_tasks(
     inputs: &SolverInputs<'_>,
-    origin: DateTime<Utc>,
     now: DateTime<Utc>,
     dependency_map: &HashMap<String, Vec<usize>>,
 ) -> Result<Vec<SolverTask>, PlannerError> {
@@ -126,8 +125,6 @@ fn build_tasks(
                 depends_on: dependency_map.get(&task.id).cloned().unwrap_or_default(),
                 not_before: now,
                 timezone: inputs.timezone,
-                slot_minutes: settings.slot_minutes,
-                horizon_origin: origin,
                 recovery_minutes: settings.recovery_minutes,
                 excess_high_penalty: settings.excess_high_penalty,
                 start_idx: None,
@@ -136,8 +133,11 @@ fn build_tasks(
         .collect()
 }
 
+/// Canonicalizes weekly windows into disjoint per-weekday intervals. The
+/// canonical form keeps the coverage rule exact: a minute can be contained by
+/// at most one fact, so overlapping user windows never double-count.
 fn availability_facts(availability: &Availability) -> Vec<SolverAvailability> {
-    let mut facts = Vec::new();
+    let mut by_weekday: BTreeMap<u32, Vec<(NaiveTime, NaiveTime)>> = BTreeMap::new();
     for (day, windows) in &availability.0 {
         let Some(weekday) = weekday_index(day) else {
             continue;
@@ -147,6 +147,20 @@ fn availability_facts(availability: &Availability) -> Vec<SolverAvailability> {
             else {
                 continue;
             };
+            by_weekday.entry(weekday).or_default().push((start, end));
+        }
+    }
+    let mut facts = Vec::new();
+    for (weekday, mut windows) in by_weekday {
+        windows.sort();
+        let mut merged: Vec<(NaiveTime, NaiveTime)> = Vec::new();
+        for (start, end) in windows {
+            match merged.last_mut() {
+                Some(last) if start <= last.1 => last.1 = last.1.max(end),
+                _ => merged.push((start, end)),
+            }
+        }
+        for (start, end) in merged {
             facts.push(SolverAvailability {
                 id: format!("availability:{weekday}:{}", facts.len()),
                 index: facts.len(),
@@ -211,4 +225,37 @@ fn load_key(load: &CognitiveLoad) -> usize {
 
 fn parse_clock(value: &str) -> Result<NaiveTime, ()> {
     NaiveTime::parse_from_str(value, "%H:%M").map_err(|_| ())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn window(start: &str, end: &str) -> TimeWindow {
+        TimeWindow {
+            start: start.into(),
+            end: end.into(),
+        }
+    }
+
+    #[test]
+    fn availability_overlaps_merge_into_one_disjoint_fact() {
+        let availability = Availability(BTreeMap::from([(
+            "mon".into(),
+            vec![window("09:00", "12:00"), window("10:00", "13:00")],
+        )]));
+        let facts = availability_facts(&availability);
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].start, parse_clock("09:00").unwrap());
+        assert_eq!(facts[0].end, parse_clock("13:00").unwrap());
+    }
+
+    #[test]
+    fn availability_keeps_split_shifts_separate() {
+        let availability = Availability(BTreeMap::from([(
+            "mon".into(),
+            vec![window("09:00", "12:00"), window("13:00", "17:00")],
+        )]));
+        assert_eq!(availability_facts(&availability).len(), 2);
+    }
 }

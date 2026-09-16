@@ -9,6 +9,7 @@ use solverforge::prelude::*;
 pub use self::assemble::create_constraints;
 
 mod assign_priority;
+mod support;
 mod future_only;
 mod respect_earliest;
 mod respect_hard_deadline;
@@ -36,7 +37,8 @@ mod assemble {
             no_task_overlap::constraint(),
             dependencies_after_tasks::constraint(),
             after_applied_predecessor::constraint(),
-            inside_availability::constraint(),
+            inside_availability::required(),
+            inside_availability::covered(),
             soft_deadline::constraint(),
             cognitive_window::constraint(),
             high_load_recovery::constraint(),

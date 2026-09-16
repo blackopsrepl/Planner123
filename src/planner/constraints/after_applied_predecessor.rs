@@ -1,4 +1,5 @@
-use crate::planner_domain::{SolverBusy, SolverPlan, SolverTask};
+use super::support::{task_row, BusyRows, TimelineRow};
+use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -8,23 +9,49 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
         .join((
-            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::busy()),
-            |task: &SolverTask, busy: &SolverBusy| {
-                busy.successors.contains(&task.index)
-                    && task.start().is_some_and(|start| start < busy.end)
-            },
+            SolverPlan::slots(),
+            joiner::equal_bi(
+                |task: &SolverTask| task.start_idx,
+                |slot: &SolverSlot| Some(slot.id),
+            ),
         ))
-        .penalize(hard_weight(|_: &SolverTask, _: &SolverBusy| {
+        .project(task_row)
+        .merge(
+            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
+                .for_each(SolverPlan::busy())
+                .project(BusyRows),
+        )
+        .join(joiner::equal(|_: &TimelineRow| ()))
+        .filter(|left: &TimelineRow, right: &TimelineRow| violates(left, right))
+        .penalize(hard_weight(|_: &TimelineRow, _: &TimelineRow| {
             HardMediumSoftScore::of_hard(1)
         }))
         .named("Start after applied predecessor")
+}
+
+fn violates(left: &TimelineRow, right: &TimelineRow) -> bool {
+    match (left, right) {
+        (
+            TimelineRow::Task(task),
+            TimelineRow::Busy {
+                end, successors, ..
+            },
+        )
+        | (
+            TimelineRow::Busy {
+                end, successors, ..
+            },
+            TimelineRow::Task(task),
+        ) => successors.contains(&task.index) && task.start < *end,
+        _ => false,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::planner_domain::test_support::{origin, slots, task};
+    use crate::planner_domain::SolverBusy;
     use chrono::Duration;
     use solverforge::ConstraintSet;
 

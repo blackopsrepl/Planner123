@@ -25,8 +25,6 @@ pub fn task(priority_weight: i64, duration_minutes: i64) -> SolverTask {
         depends_on: Vec::new(),
         not_before: origin(),
         timezone: Tz::UTC,
-        slot_minutes: 30,
-        horizon_origin: origin(),
         recovery_minutes: 60,
         excess_high_penalty: 5,
         start_idx: None,
