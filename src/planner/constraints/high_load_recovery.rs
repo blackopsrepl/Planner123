@@ -1,11 +1,10 @@
-use super::support::{task_row, TaskInterval, TimelineRow};
+use super::support::TaskInterval;
 use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
-/// SOFT: separate high cognitive-load inbox tasks by the configured recovery
-/// gap. The later task of a violating pair carries the penalty; work that
-/// starts after a task never creates pressure on it.
+/// SOFT: charge each high-load task once when preceding inbox and applied
+/// high-load work within its recovery gap reaches the configured streak limit.
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
@@ -16,34 +15,44 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
                 |slot: &SolverSlot| Some(slot.id),
             ),
         ))
-        .project(task_row)
-        .join(joiner::equal(|_: &TimelineRow| ()))
-        .filter(|left: &TimelineRow, right: &TimelineRow| violation_penalty(left, right) > 0)
-        .penalize(|left: &TimelineRow, right: &TimelineRow| {
-            HardMediumSoftScore::of_soft(violation_penalty(left, right))
+        .project(|task: &SolverTask, slot: &SolverSlot| TaskInterval::new(task, slot))
+        .filter(|interval: &TaskInterval| interval.is_high())
+        .group_by(
+            |_: &TaskInterval| (),
+            collect_vec(|interval: &TaskInterval| interval.clone()),
+        )
+        .penalize(|_: &(), intervals: &CollectedVec<TaskInterval>| {
+            HardMediumSoftScore::of_soft(
+                intervals
+                    .iter()
+                    .map(|target| recovery_penalty(target, intervals.iter()))
+                    .sum(),
+            )
         })
-        .named(super::names::INBOX_RECOVERY)
+        .named(super::names::HIGH_LOAD_RECOVERY)
 }
 
-/// The penalty the later task of a violating pair owes, or zero when the pair
-/// is separated enough or not both high-load.
-fn violation_penalty(left: &TimelineRow, right: &TimelineRow) -> i64 {
-    match (left, right) {
-        (TimelineRow::Task(predecessor), TimelineRow::Task(target)) => {
-            if precedes(predecessor, target) {
-                target.excess_high_penalty
-            } else if precedes(target, predecessor) {
-                predecessor.excess_high_penalty
-            } else {
-                0
-            }
-        }
-        _ => 0,
+/// Target-owned recovery penalty shared by scoring and proposal diagnostics.
+pub(crate) fn recovery_penalty<'a>(
+    target: &TaskInterval,
+    intervals: impl IntoIterator<Item = &'a TaskInterval>,
+) -> i64 {
+    if !target.is_high() {
+        return 0;
     }
-}
-
-fn precedes(predecessor: &TaskInterval, target: &TaskInterval) -> bool {
-    target.gap_recovers(predecessor.end, predecessor.is_high())
+    let inbox_pressure = intervals
+        .into_iter()
+        .filter(|predecessor| {
+            predecessor.index != target.index
+                && target.gap_recovers(predecessor.end, predecessor.is_high())
+        })
+        .count();
+    let pressure = inbox_pressure + target.applied_recovery_pressure();
+    if pressure >= target.high_streak_limit as usize {
+        target.excess_high_penalty
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]
@@ -51,38 +60,28 @@ mod tests {
     use super::*;
     use crate::planner_domain::test_support::{slots, task};
 
-    fn plan(start_idxs: [Option<usize>; 2]) -> SolverPlan {
-        let mut first = task(3, 60);
-        first.id = 0;
-        first.index = 0;
-        first.start_idx = start_idxs[0];
-        let mut second = task(3, 60);
-        second.id = 1;
-        second.task_id = "task-1".into();
-        second.index = 1;
-        second.start_idx = start_idxs[1];
-        SolverPlan::new(
-            slots(8),
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            vec![first, second],
-            1,
-        )
-    }
-
-    fn high_load(mut plan: SolverPlan) -> SolverPlan {
-        for task in &mut plan.tasks {
-            task.load = 2;
-            task.recovery_minutes = 60;
-        }
-        plan
+    fn plan(start_idxs: &[Option<usize>], streak_limit: i64) -> SolverPlan {
+        let tasks = start_idxs
+            .iter()
+            .enumerate()
+            .map(|(index, start_idx)| {
+                let mut value = task(3, 60);
+                value.id = index;
+                value.task_id = format!("task-{index}");
+                value.index = index;
+                value.load = 2;
+                value.recovery_minutes = 150;
+                value.high_streak_limit = streak_limit;
+                value.start_idx = *start_idx;
+                value
+            })
+            .collect();
+        SolverPlan::new(slots(8), vec![], vec![], vec![], vec![], tasks, 1)
     }
 
     #[test]
-    fn penalizes_the_later_task_of_a_back_to_back_pair() {
-        let plan = high_load(plan([Some(0), Some(2)]));
+    fn penalizes_a_target_once_when_inbox_pressure_reaches_the_limit() {
+        let plan = plan(&[Some(0), Some(2), Some(4)], 2);
         assert_eq!(
             (constraint(),).evaluate_all(&plan),
             HardMediumSoftScore::of_soft(-5)
@@ -90,24 +89,30 @@ mod tests {
     }
 
     #[test]
-    fn separated_or_low_load_pairs_are_ignored() {
-        let separated = high_load(plan([Some(0), Some(4)]));
+    fn pressure_below_the_limit_is_ignored() {
+        let separated = plan(&[Some(0), Some(2)], 2);
         assert_eq!(
             (constraint(),).evaluate_all(&separated),
-            HardMediumSoftScore::ZERO
-        );
-        let low_pair = plan([Some(0), Some(2)]);
-        assert_eq!(
-            (constraint(),).evaluate_all(&low_pair),
             HardMediumSoftScore::ZERO
         );
     }
 
     #[test]
-    fn unassigned_predecessors_create_no_pressure() {
-        let half_assigned = high_load(plan([None, Some(2)]));
+    fn inbox_and_applied_pressure_combine_at_the_threshold() {
+        let mut plan = plan(&[Some(0), Some(2)], 2);
+        plan.tasks[1].applied_predecessor_ends = vec![slots(1)[0].start];
         assert_eq!(
-            (constraint(),).evaluate_all(&half_assigned),
+            (constraint(),).evaluate_all(&plan),
+            HardMediumSoftScore::of_soft(-5)
+        );
+    }
+
+    #[test]
+    fn low_load_targets_and_unassigned_predecessors_are_ignored() {
+        let mut plan = plan(&[None, Some(2)], 1);
+        plan.tasks[1].load = 1;
+        assert_eq!(
+            (constraint(),).evaluate_all(&plan),
             HardMediumSoftScore::ZERO
         );
     }

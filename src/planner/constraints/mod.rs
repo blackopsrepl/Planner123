@@ -9,6 +9,7 @@ use solverforge::prelude::*;
 pub use self::assemble::create_constraints;
 
 pub(crate) use self::cognitive_window::minutes_outside;
+pub(crate) use self::high_load_recovery::recovery_penalty;
 pub(crate) use self::inside_availability::fully_covered;
 pub(crate) use self::support::TaskInterval;
 
@@ -16,8 +17,7 @@ pub(crate) use self::support::TaskInterval;
 /// proposal diagnostics can never drift from the scored model.
 pub(crate) mod names {
     pub const COGNITIVE_WINDOWS: &str = "Prefer cognitive windows";
-    pub const INBOX_RECOVERY: &str = "High cognitive-load recovery";
-    pub const APPLIED_RECOVERY: &str = "Applied high cognitive-load recovery";
+    pub const HIGH_LOAD_RECOVERY: &str = "High cognitive-load recovery";
 }
 
 mod assign_priority;
@@ -33,7 +33,6 @@ mod inside_availability;
 mod soft_deadline;
 mod cognitive_window;
 mod high_load_recovery;
-mod applied_recovery;
 
 mod assemble {
     use super::*;
@@ -54,7 +53,6 @@ mod assemble {
             soft_deadline::constraint(),
             cognitive_window::constraint(),
             high_load_recovery::constraint(),
-            applied_recovery::constraint(),
         )
     }
 }

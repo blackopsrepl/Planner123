@@ -1,6 +1,6 @@
 use super::*;
 
-use super::constraints::{minutes_outside, names, TaskInterval};
+use super::constraints::{minutes_outside, names, recovery_penalty, TaskInterval};
 use solverforge::Analyzable;
 
 /// Runs one optimization and persists a proposal. Nothing else is mutated.
@@ -137,8 +137,8 @@ pub fn optimize(
 
 /// Per-task soft penalties, owned by the task the scoring rule charges:
 /// cognitive cost belongs to the task sitting outside its window, and
-/// recovery cost belongs to the later task of a violating pair or the task
-/// whose applied-block pressure reaches the streak limit.
+/// recovery cost belongs to the high-load task whose combined preceding inbox
+/// and applied pressure reaches the configured streak limit.
 #[derive(Clone, Default)]
 struct TaskPenalties {
     cognitive: i64,
@@ -168,23 +168,7 @@ fn task_penalties(plan: &SolverPlan) -> Result<Vec<TaskPenalties>, PlannerError>
             .map_or(0, |window| {
                 minutes_outside(interval, window.start, window.end) * window.outside_penalty
             });
-        // The recovery rule charges the target per violating predecessor, so
-        // item penalties repeat the target's weight for each one.
-        let inbox_fatigue: i64 = intervals
-            .iter()
-            .flatten()
-            .filter(|predecessor| {
-                predecessor.index != interval.index
-                    && interval.gap_recovers(predecessor.end, predecessor.is_high())
-            })
-            .map(|_| interval.excess_high_penalty)
-            .sum();
-        let fatigue = if interval.applied_recovery_pressure() >= interval.high_streak_limit as usize
-        {
-            inbox_fatigue + interval.excess_high_penalty
-        } else {
-            inbox_fatigue
-        };
+        let fatigue = recovery_penalty(interval, intervals.iter().flatten());
         penalties[index] = TaskPenalties { cognitive, fatigue };
     }
 
@@ -209,7 +193,7 @@ fn reconcile_with_analysis(
     let cognitive_total: i64 = penalties.iter().map(|penalty| penalty.cognitive).sum();
     let fatigue_total: i64 = penalties.iter().map(|penalty| penalty.fatigue).sum();
     let expected_cognitive = -soft(names::COGNITIVE_WINDOWS);
-    let expected_fatigue = -(soft(names::INBOX_RECOVERY) + soft(names::APPLIED_RECOVERY));
+    let expected_fatigue = -soft(names::HIGH_LOAD_RECOVERY);
     if cognitive_total != expected_cognitive || fatigue_total != expected_fatigue {
         return Err(PlannerError::Internal(format!(
             "proposal penalties do not reconcile with score analysis: cognitive {cognitive_total} vs {expected_cognitive}, fatigue {fatigue_total} vs {expected_fatigue}"
@@ -236,7 +220,7 @@ fn explanation(
         };
     }
     if entry.fatigue > 0 {
-        return Some("High cognitive-load recovery gap below the configured minimum.".into());
+        return Some("High cognitive-load streak reaches the configured recovery limit.".into());
     }
     if entry.cognitive > 0 {
         return Some("Scheduled partially outside the cognitive preference window.".into());

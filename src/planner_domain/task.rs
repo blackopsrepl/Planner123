@@ -36,8 +36,8 @@ pub struct SolverTask {
     pub timezone: Tz,
     pub recovery_minutes: i64,
     pub excess_high_penalty: i64,
-    /// How many preceding high-load blocks are tolerated before a task is
-    /// charged the excess recovery penalty.
+    /// Number of preceding high-load blocks that triggers one excess recovery
+    /// penalty for this task.
     pub high_streak_limit: i64,
     #[planning_variable(value_range_provider = "slots", allows_unassigned = true)]
     pub start_idx: Option<usize>,

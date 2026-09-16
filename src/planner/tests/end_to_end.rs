@@ -136,6 +136,7 @@ fn item_penalties_reconcile_additively_with_the_recovery_score() {
             )]))),
             recovery_minutes: Some(150),
             excess_high_penalty: Some(7),
+            high_streak_limit: Some(2),
             ..Default::default()
         },
     )
@@ -148,16 +149,22 @@ fn item_penalties_reconcile_additively_with_the_recovery_score() {
         create_task(&conn, input).unwrap();
     }
 
-    // The three-hour window forces the tasks back to back, so the last task
-    // violates against two predecessors and the score carries three pair
-    // penalties: 7 for H2, 14 for H3.
+    // The three-hour window forces the tasks back to back. H2 remains below
+    // the limit; H3 reaches two predecessors and is charged exactly once.
     let proposal = optimize(&conn, Some(2)).unwrap();
     assert_eq!(
         proposal.proposal.score.as_deref(),
-        Some("0hard/0medium/-21soft")
+        Some("0hard/0medium/-7soft")
     );
+    let mut fatigue: Vec<_> = proposal
+        .items
+        .iter()
+        .map(|item| item.fatigue_penalty)
+        .collect();
+    fatigue.sort_unstable();
+    assert_eq!(fatigue, vec![0, 0, 7]);
     let fatigue_total: i64 = proposal.items.iter().map(|item| item.fatigue_penalty).sum();
-    assert_eq!(fatigue_total, 21);
+    assert_eq!(fatigue_total, 7);
 }
 
 #[test]

@@ -65,21 +65,7 @@ pub(super) fn build_plan(
         })
         .collect();
     let applied = applied_blocks(conn, inputs.tasks, &dependencies)?;
-    let applied_ends: HashMap<String, Vec<DateTime<Utc>>> = applied
-        .iter()
-        .filter(|block| block.high)
-        .flat_map(|block| {
-            block.successors.iter().filter_map(|index| {
-                inputs
-                    .tasks
-                    .get(*index)
-                    .map(|task| (task.id.clone(), block.end))
-            })
-        })
-        .fold(HashMap::new(), |mut ends, (task_id, end)| {
-            ends.entry(task_id).or_default().push(end);
-            ends
-        });
+    let applied_ends = applied_recovery_ends(&applied);
 
     Ok(BuiltPlan {
         plan: SolverPlan::new(
@@ -95,11 +81,19 @@ pub(super) fn build_plan(
     })
 }
 
+fn applied_recovery_ends(applied: &[SolverAppliedBlock]) -> Vec<DateTime<Utc>> {
+    applied
+        .iter()
+        .filter(|block| block.high)
+        .map(|block| block.end)
+        .collect()
+}
+
 fn build_tasks(
     inputs: &SolverInputs<'_>,
     now: DateTime<Utc>,
     dependency_map: &HashMap<String, Vec<usize>>,
-    applied_ends: &HashMap<String, Vec<DateTime<Utc>>>,
+    applied_ends: &[DateTime<Utc>],
 ) -> Result<Vec<SolverTask>, PlannerError> {
     let settings = inputs.settings;
     inputs
@@ -138,7 +132,7 @@ fn build_tasks(
                     .then_some(deadline)
                     .flatten(),
                 depends_on: dependency_map.get(&task.id).cloned().unwrap_or_default(),
-                applied_predecessor_ends: applied_ends.get(&task.id).cloned().unwrap_or_default(),
+                applied_predecessor_ends: applied_ends.to_vec(),
                 not_before: now,
                 timezone: inputs.timezone,
                 recovery_minutes: settings.recovery_minutes,
@@ -238,6 +232,7 @@ fn load_key(load: &CognitiveLoad) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::planner_domain::test_support::applied_block;
 
     fn window(start: &str, end: &str) -> TimeWindow {
         TimeWindow {
@@ -265,5 +260,13 @@ mod tests {
             vec![window("09:00", "12:00"), window("13:00", "17:00")],
         )]));
         assert_eq!(availability_facts(&availability).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn recovery_uses_all_applied_high_load_blocks_without_dependency_edges() {
+        let high = applied_block(0, 60, true, vec![]);
+        let low = applied_block(60, 120, false, vec![0]);
+        let expected = high.end;
+        assert_eq!(applied_recovery_ends(&[high, low]), vec![expected]);
     }
 }
