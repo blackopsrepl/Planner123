@@ -27,6 +27,16 @@ pub(super) fn classify(
     task_index: usize,
 ) -> UnscheduledEvidence {
     let task = &plan.tasks[task_index];
+    let mut visiting = vec![false; plan.tasks.len()];
+    if task.depends_on.iter().any(|predecessor| {
+        !dependency_chain_has_hard_slot(plan, horizon_end, *predecessor, &mut visiting)
+    }) {
+        return UnscheduledEvidence {
+            outcome: PlannerProposalOutcome::NoHardFeasibleSlot,
+            busy_blockers: Vec::new(),
+            busy_blockers_omitted: 0,
+        };
+    }
     let mut blocked_by: Vec<&SolverBusy> = Vec::new();
     for slot in &plan.slots {
         let interval = TaskInterval::new(task, slot);
@@ -69,6 +79,42 @@ pub(super) fn classify(
             .collect(),
         busy_blockers_omitted,
     }
+}
+
+fn has_individual_hard_slot(
+    plan: &SolverPlan,
+    horizon_end: DateTime<Utc>,
+    task_index: usize,
+) -> bool {
+    let task = &plan.tasks[task_index];
+    plan.slots.iter().any(|slot| {
+        let interval = TaskInterval::new(task, slot);
+        hard_feasible_ignoring_busy(plan, horizon_end, task_index, &interval)
+            && plan
+                .busy
+                .iter()
+                .all(|busy| !interval.overlaps(busy.start, busy.end))
+    })
+}
+
+fn dependency_chain_has_hard_slot(
+    plan: &SolverPlan,
+    horizon_end: DateTime<Utc>,
+    task_index: usize,
+    visiting: &mut [bool],
+) -> bool {
+    let Some(task) = plan.tasks.get(task_index) else {
+        return false;
+    };
+    if visiting[task_index] || !has_individual_hard_slot(plan, horizon_end, task_index) {
+        return false;
+    }
+    visiting[task_index] = true;
+    let feasible = task.depends_on.iter().all(|predecessor| {
+        dependency_chain_has_hard_slot(plan, horizon_end, *predecessor, visiting)
+    });
+    visiting[task_index] = false;
+    feasible
 }
 
 /// Hard rules from the constraint set, minus busy overlap and minus the

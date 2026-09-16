@@ -46,6 +46,7 @@ fn configure_utc_workweek(conn: &Connection) {
 }
 
 mod configuration;
+mod dependencies;
 mod end_to_end;
 mod lifecycle;
 mod scheduling;

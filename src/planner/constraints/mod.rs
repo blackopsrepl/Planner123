@@ -27,6 +27,7 @@ mod respect_earliest;
 mod respect_hard_deadline;
 mod no_busy_overlap;
 mod no_task_overlap;
+mod dependencies_assigned;
 mod dependencies_after_tasks;
 mod after_applied_predecessor;
 mod inside_availability;
@@ -46,6 +47,7 @@ mod assemble {
             respect_hard_deadline::constraint(),
             no_busy_overlap::constraint(),
             no_task_overlap::constraint(),
+            dependencies_assigned::constraint(),
             dependencies_after_tasks::constraint(),
             after_applied_predecessor::constraint(),
             inside_availability::required(),
