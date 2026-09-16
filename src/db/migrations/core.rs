@@ -10,6 +10,7 @@ pub(crate) const MIGRATION_V4: &str = "20260830000001";
 pub(crate) const MIGRATION_V5: &str = "20260831000001";
 pub(crate) const MIGRATION_V6: &str = "20260831000002";
 pub(crate) const MIGRATION_V7: &str = "20260831000003";
+pub(crate) const MIGRATION_V8: &str = "20260916000001";
 
 pub(crate) fn migrate(conn: &Connection) -> Result<()> {
     // Rails-compatible schema_migrations table.
@@ -52,6 +53,11 @@ pub(crate) fn migrate(conn: &Connection) -> Result<()> {
     if !migration_applied(conn, MIGRATION_V7)? {
         migrate_v7(conn)?;
         record_migration(conn, MIGRATION_V7)?;
+    }
+
+    if !migration_applied(conn, MIGRATION_V8)? {
+        migrate_v8(conn)?;
+        record_migration(conn, MIGRATION_V8)?;
     }
 
     Ok(())

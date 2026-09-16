@@ -126,3 +126,20 @@ pub(super) fn migrate_v7(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+pub(super) fn migrate_v8(conn: &Connection) -> Result<()> {
+    // v7 backfilled exactly '{}' for rows that predate typed diagnostics. Give
+    // those known-legacy rows a real outcome so strict decoding keeps working;
+    // anything else stays untouched and must fail loudly instead of being
+    // silently defaulted.
+    conn.execute(
+        "UPDATE planner_proposal_items
+         SET diagnostics_json = CASE scheduled
+             WHEN 1 THEN '{\"outcome\":\"scheduled\",\"busy_blockers\":[],\"busy_blockers_omitted\":0}'
+             ELSE '{\"outcome\":\"unassigned\",\"busy_blockers\":[],\"busy_blockers_omitted\":0}'
+         END
+         WHERE diagnostics_json = '{}'",
+        [],
+    )?;
+    Ok(())
+}
