@@ -60,7 +60,9 @@ pub fn optimize(
                 .format(time::STORAGE_FORMAT)
                 .to_string()
         })
-        .unwrap_or_else(now);
+        .ok_or_else(|| {
+            PlannerError::Validation("the planner horizon produced no candidate slots".into())
+        })?;
     let snapshot = proposal_snapshot(conn, &settings)?;
     let proposal = PlannerProposal {
         id: proposal_id.clone(),
@@ -86,7 +88,7 @@ pub fn optimize(
                         .to_string(),
                 ),
                 Some(
-                    (slot.start + Duration::minutes(task.duration_minutes))
+                    task.end_at(slot)
                         .with_timezone(&timezone)
                         .format(time::STORAGE_FORMAT)
                         .to_string(),

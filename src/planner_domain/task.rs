@@ -3,9 +3,11 @@
 //! `start_idx` is the only planning variable. Its value is resolved through
 //! the owning `SolverPlan.slots` collection by constraint streams.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use chrono_tz::Tz;
 use solverforge::prelude::*;
+
+use super::SolverSlot;
 
 /// A single task whose start instant the solver chooses.
 #[planning_entity]
@@ -33,4 +35,12 @@ pub struct SolverTask {
     pub excess_high_penalty: i64,
     #[planning_variable(value_range_provider = "slots", allows_unassigned = true)]
     pub start_idx: Option<usize>,
+}
+
+impl SolverTask {
+    /// Resolved end instant when this task starts at `slot`. This is the single
+    /// place the task interval is derived from the selected `SolverSlot`.
+    pub fn end_at(&self, slot: &SolverSlot) -> DateTime<Utc> {
+        slot.start + Duration::minutes(self.duration_minutes)
+    }
 }

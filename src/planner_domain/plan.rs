@@ -64,12 +64,6 @@ impl SolverPlan {
     /// Recomputes dense indexes and drops out-of-range scalar assignments after
     /// transport decoding.
     pub fn rebuild_derived_fields(&mut self) {
-        for (index, busy) in self.busy.iter_mut().enumerate() {
-            busy.index = index;
-        }
-        for (index, window) in self.availability.iter_mut().enumerate() {
-            window.index = index;
-        }
         for (index, task) in self.tasks.iter_mut().enumerate() {
             task.index = index;
             task.start_idx = task.start_idx.filter(|idx| *idx < self.slots.len());

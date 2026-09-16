@@ -1,5 +1,4 @@
 use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
-use chrono::Duration;
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -22,7 +21,7 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
 }
 
 fn late_minutes(task: &SolverTask, slot: &SolverSlot) -> i64 {
-    let end = slot.start + Duration::minutes(task.duration_minutes);
+    let end = task.end_at(slot);
     match task.soft_deadline {
         Some(deadline) if end > deadline => (end - deadline).num_minutes(),
         _ => 0,
@@ -33,6 +32,7 @@ fn late_minutes(task: &SolverTask, slot: &SolverSlot) -> i64 {
 mod tests {
     use super::*;
     use crate::planner_domain::test_support::{origin, slots, task};
+    use chrono::Duration;
     use solverforge::ConstraintSet;
 
     fn plan(start_idx: Option<usize>, deadline_offset_minutes: i64) -> SolverPlan {

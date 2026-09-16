@@ -160,7 +160,6 @@ pub(super) fn applied_busy(
         };
         busy.push(SolverBusy {
             id: format!("applied:{event_id}"),
-            index: 0,
             start,
             end,
             high: load == "high",

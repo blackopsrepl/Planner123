@@ -1,5 +1,4 @@
 use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
-use chrono::Duration;
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -15,9 +14,8 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
             ),
         ))
         .filter(|task: &SolverTask, slot: &SolverSlot| {
-            task.hard_deadline.is_some_and(|deadline| {
-                slot.start + Duration::minutes(task.duration_minutes) > deadline
-            })
+            task.hard_deadline
+                .is_some_and(|deadline| task.end_at(slot) > deadline)
         })
         .penalize(hard_weight(|_: &SolverTask, _: &SolverSlot| {
             HardMediumSoftScore::of_hard(1)
@@ -29,6 +27,7 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
 mod tests {
     use super::*;
     use crate::planner_domain::test_support::{origin, slots, task};
+    use chrono::Duration;
     use solverforge::ConstraintSet;
 
     fn plan(start_idx: Option<usize>, deadline_offset_minutes: Option<i64>) -> SolverPlan {

@@ -1,7 +1,7 @@
 use crate::planner_domain::{
     SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverSlot, SolverTask,
 };
-use chrono::{DateTime, Duration, NaiveTime, Utc};
+use chrono::{DateTime, NaiveTime, Utc};
 use chrono_tz::Tz;
 use solverforge::prelude::*;
 
@@ -22,7 +22,7 @@ impl TaskInterval {
         Self {
             index: task.index,
             start: slot.start,
-            end: slot.start + Duration::minutes(task.duration_minutes),
+            end: task.end_at(slot),
             load: task.load,
             depends_on: task.depends_on.clone(),
             timezone: task.timezone,

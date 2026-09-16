@@ -49,7 +49,6 @@ mod tests {
     fn busy(start_offset: i64, end_offset: i64) -> SolverBusy {
         SolverBusy {
             id: "busy-0".into(),
-            index: 0,
             start: origin() + Duration::minutes(start_offset),
             end: origin() + Duration::minutes(end_offset),
             high: false,

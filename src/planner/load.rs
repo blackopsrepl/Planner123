@@ -2,9 +2,9 @@
 //! entities.
 //!
 //! This module contains no scheduling policy: it builds the uniform slot grid,
-//! the raw availability and cognitive windows, the blocked intervals, and the
-//! task entities. Every rule that decides legality or quality lives in
-//! `crate::planner::constraints`.
+//! canonical disjoint availability windows, cognitive windows, blocked
+//! intervals, and task entities. Every rule that decides legality or quality
+//! lives in `crate::planner::constraints`.
 
 use super::*;
 
@@ -54,7 +54,7 @@ pub(super) fn build_plan(
         availability_facts(inputs.availability),
         cognitive_facts(settings),
         build_tasks(inputs, now, &dependency_map)?,
-        settings.solve_seconds.max(1) as u64,
+        settings.solve_seconds as u64,
     ))
 }
 
@@ -68,7 +68,6 @@ fn existing_busy(
         .enumerate()
         .map(|(index, occurrence)| SolverBusy {
             id: format!("busy:{index}"),
-            index,
             start: occurrence.start,
             end: occurrence.end,
             high: false,
@@ -163,7 +162,6 @@ fn availability_facts(availability: &Availability) -> Vec<SolverAvailability> {
         for (start, end) in merged {
             facts.push(SolverAvailability {
                 id: format!("availability:{weekday}:{}", facts.len()),
-                index: facts.len(),
                 weekday,
                 start,
                 end,

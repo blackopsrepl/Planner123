@@ -11,7 +11,7 @@ pub fn required() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore>
         .for_each(SolverPlan::tasks())
         .filter(|task: &SolverTask| task.start_idx.is_some())
         .penalize(hard_weight(|task: &SolverTask| {
-            HardMediumSoftScore::of_hard(task.duration_minutes.max(1))
+            HardMediumSoftScore::of_hard(task.duration_minutes)
         }))
         .named("Require available minutes")
 }
@@ -70,7 +70,7 @@ fn task_covered_minutes(
     window_start: chrono::NaiveTime,
     window_end: chrono::NaiveTime,
 ) -> i64 {
-    let duration = (task.end - task.start).num_minutes().max(0);
+    let duration = (task.end - task.start).num_minutes();
     (0..duration)
         .filter(|offset| {
             let instant = task.start + Duration::minutes(*offset);
@@ -89,10 +89,9 @@ mod tests {
     use chrono::NaiveTime;
     use solverforge::ConstraintSet;
 
-    fn window(index: usize, start: (u32, u32), end: (u32, u32)) -> SolverAvailability {
+    fn window(id: &str, start: (u32, u32), end: (u32, u32)) -> SolverAvailability {
         SolverAvailability {
-            id: format!("window-{index}"),
-            index,
+            id: id.into(),
             weekday: 0,
             start: NaiveTime::from_hms_opt(start.0, start.1, 0).unwrap(),
             end: NaiveTime::from_hms_opt(end.0, end.1, 0).unwrap(),
@@ -112,7 +111,7 @@ mod tests {
     #[test]
     fn penalizes_each_unavailable_minute() {
         assert_eq!(
-            score(&plan(Some(0), vec![window(0, (0, 30), (1, 0))])),
+            score(&plan(Some(0), vec![window("a", (0, 30), (1, 0))])),
             HardMediumSoftScore::of_hard(-30)
         );
     }
@@ -122,7 +121,7 @@ mod tests {
         assert_eq!(
             score(&plan(
                 Some(18),
-                vec![window(0, (9, 0), (9, 30)), window(1, (9, 30), (10, 0))],
+                vec![window("a", (9, 0), (9, 30)), window("b", (9, 30), (10, 0)),],
             )),
             HardMediumSoftScore::ZERO
         );

@@ -24,7 +24,6 @@ pub struct SolverSlot {
 pub struct SolverBusy {
     #[planning_id]
     pub id: String,
-    pub index: usize,
     pub start: DateTime<Utc>,
     pub end: DateTime<Utc>,
     /// Whether this interval is a high cognitive-load block from an applied
@@ -39,13 +38,13 @@ pub struct SolverBusy {
     pub recurring: bool,
 }
 
-/// One raw weekly availability window. Repeated weekdays are separate facts,
-/// which is how split shifts are represented.
+/// One weekly availability window. The loader canonicalizes each weekday into
+/// disjoint intervals, so a minute is contained by at most one fact; split
+/// shifts remain separate facts.
 #[problem_fact]
 pub struct SolverAvailability {
     #[planning_id]
     pub id: String,
-    pub index: usize,
     /// Days from Monday, 0..=6.
     pub weekday: u32,
     pub start: NaiveTime,

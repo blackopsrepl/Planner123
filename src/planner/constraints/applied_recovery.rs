@@ -66,7 +66,6 @@ mod tests {
     fn block(start_offset: i64, end_offset: i64, high: bool) -> SolverBusy {
         SolverBusy {
             id: "block-0".into(),
-            index: 0,
             start: origin() + Duration::minutes(start_offset),
             end: origin() + Duration::minutes(end_offset),
             high,
