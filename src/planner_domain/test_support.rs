@@ -23,10 +23,12 @@ pub fn task(priority_weight: i64, duration_minutes: i64) -> SolverTask {
         hard_deadline: None,
         soft_deadline: None,
         depends_on: Vec::new(),
+        applied_predecessor_ends: Vec::new(),
         not_before: origin(),
         timezone: Tz::UTC,
         recovery_minutes: 60,
         excess_high_penalty: 5,
+        high_streak_limit: 1,
         start_idx: None,
     }
 }

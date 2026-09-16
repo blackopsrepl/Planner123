@@ -27,12 +27,18 @@ pub struct SolverTask {
     pub soft_deadline: Option<DateTime<Utc>>,
     /// Indexes of predecessor tasks this task must start after.
     pub depends_on: Vec<usize>,
+    /// Ends of applied high cognitive-load blocks this task must recover
+    /// after. Relational data, attached by the loader.
+    pub applied_predecessor_ends: Vec<DateTime<Utc>>,
     /// Global lower bound: optimization time, so no assignment lands in the
     /// past.
     pub not_before: DateTime<Utc>,
     pub timezone: Tz,
     pub recovery_minutes: i64,
     pub excess_high_penalty: i64,
+    /// How many preceding high-load blocks are tolerated before a task is
+    /// charged the excess recovery penalty.
+    pub high_streak_limit: i64,
     #[planning_variable(value_range_provider = "slots", allows_unassigned = true)]
     pub start_idx: Option<usize>,
 }

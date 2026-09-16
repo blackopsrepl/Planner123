@@ -64,16 +64,31 @@ pub(super) fn build_plan(
             end: occurrence.end,
         })
         .collect();
-    let applied_blocks = applied_blocks(conn, inputs.tasks, &dependencies)?;
+    let applied = applied_blocks(conn, inputs.tasks, &dependencies)?;
+    let applied_ends: HashMap<String, Vec<DateTime<Utc>>> = applied
+        .iter()
+        .filter(|block| block.high)
+        .flat_map(|block| {
+            block.successors.iter().filter_map(|index| {
+                inputs
+                    .tasks
+                    .get(*index)
+                    .map(|task| (task.id.clone(), block.end))
+            })
+        })
+        .fold(HashMap::new(), |mut ends, (task_id, end)| {
+            ends.entry(task_id).or_default().push(end);
+            ends
+        });
 
     Ok(BuiltPlan {
         plan: SolverPlan::new(
             slots,
             busy,
-            applied_blocks,
+            applied,
             availability_facts(inputs.availability)?,
             cognitive_facts(settings)?,
-            build_tasks(inputs, now, &dependency_map)?,
+            build_tasks(inputs, now, &dependency_map, &applied_ends)?,
             settings.solve_seconds as u64,
         ),
         horizon_end,
@@ -84,6 +99,7 @@ fn build_tasks(
     inputs: &SolverInputs<'_>,
     now: DateTime<Utc>,
     dependency_map: &HashMap<String, Vec<usize>>,
+    applied_ends: &HashMap<String, Vec<DateTime<Utc>>>,
 ) -> Result<Vec<SolverTask>, PlannerError> {
     let settings = inputs.settings;
     inputs
@@ -122,10 +138,12 @@ fn build_tasks(
                     .then_some(deadline)
                     .flatten(),
                 depends_on: dependency_map.get(&task.id).cloned().unwrap_or_default(),
+                applied_predecessor_ends: applied_ends.get(&task.id).cloned().unwrap_or_default(),
                 not_before: now,
                 timezone: inputs.timezone,
                 recovery_minutes: settings.recovery_minutes,
                 excess_high_penalty: settings.excess_high_penalty,
+                high_streak_limit: settings.high_streak_limit,
                 start_idx: None,
             })
         })

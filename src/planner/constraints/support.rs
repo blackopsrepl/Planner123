@@ -16,6 +16,9 @@ pub(crate) struct TaskInterval {
     pub(super) timezone: Tz,
     pub(super) recovery_minutes: i64,
     pub(super) excess_high_penalty: i64,
+    pub(super) high_streak_limit: i64,
+    /// Ends of applied high-load blocks, attached from the owning task.
+    pub(super) applied_predecessor_ends: Vec<DateTime<Utc>>,
 }
 
 impl TaskInterval {
@@ -29,6 +32,8 @@ impl TaskInterval {
             timezone: task.timezone,
             recovery_minutes: task.recovery_minutes,
             excess_high_penalty: task.excess_high_penalty,
+            high_streak_limit: task.high_streak_limit,
+            applied_predecessor_ends: task.applied_predecessor_ends.clone(),
         }
     }
 
@@ -36,19 +41,20 @@ impl TaskInterval {
         self.start < end && start < self.end
     }
 
-    pub fn gap(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> i64 {
-        if self.end <= start {
-            (start - self.end).num_minutes()
-        } else if end <= self.start {
-            (self.start - end).num_minutes()
-        } else {
-            0
-        }
+    /// Whether this task carries a high cognitive load (`load` key 2).
+    pub(super) fn is_high(&self) -> bool {
+        self.load == 2
     }
 
-    /// Whether this task carries a high cognitive load (`load` key 2).
-    pub fn is_high(&self) -> bool {
-        self.load == 2
+    /// How many applied high-load blocks end within this task's recovery gap
+    /// before it starts.
+    pub(super) fn applied_recovery_pressure(&self) -> usize {
+        self.applied_predecessor_ends
+            .iter()
+            .filter(|end| {
+                **end <= self.start && (self.start - **end).num_minutes() < self.recovery_minutes
+            })
+            .count()
     }
 }
 
@@ -60,9 +66,7 @@ pub(super) enum TimelineRow {
         end: DateTime<Utc>,
     },
     Applied {
-        start: DateTime<Utc>,
         end: DateTime<Utc>,
-        high: bool,
         successors: Vec<usize>,
     },
     Availability {
@@ -110,9 +114,7 @@ impl Projection<SolverAppliedBlock> for AppliedRows {
         Sink: ProjectionSink<Self::Out>,
     {
         sink.emit(TimelineRow::Applied {
-            start: block.start,
             end: block.end,
-            high: block.high,
             successors: block.successors.clone(),
         });
     }
