@@ -51,8 +51,8 @@ pub(super) fn build_plan(
     Ok(SolverPlan::new(
         slots,
         busy,
-        availability_facts(inputs.availability),
-        cognitive_facts(settings),
+        availability_facts(inputs.availability)?,
+        cognitive_facts(settings)?,
         build_tasks(inputs, now, &dependency_map)?,
         settings.solve_seconds as u64,
     ))
@@ -72,10 +72,6 @@ fn existing_busy(
             end: occurrence.end,
             high: false,
             successors: Vec::new(),
-            event_id: occurrence.event_id,
-            event_title: occurrence.event_title,
-            calendar_id: occurrence.calendar_id,
-            recurring: occurrence.recurring,
         })
         .collect())
 }
@@ -135,17 +131,16 @@ fn build_tasks(
 /// Canonicalizes weekly windows into disjoint per-weekday intervals. The
 /// canonical form keeps the coverage rule exact: a minute can be contained by
 /// at most one fact, so overlapping user windows never double-count.
-fn availability_facts(availability: &Availability) -> Vec<SolverAvailability> {
+fn availability_facts(
+    availability: &Availability,
+) -> Result<Vec<SolverAvailability>, PlannerError> {
     let mut by_weekday: BTreeMap<u32, Vec<(NaiveTime, NaiveTime)>> = BTreeMap::new();
     for (day, windows) in &availability.0 {
-        let Some(weekday) = weekday_index(day) else {
-            continue;
-        };
+        let weekday = weekday_index(day)
+            .ok_or_else(|| PlannerError::Validation(format!("invalid weekday '{day}'")))?;
         for window in windows {
-            let (Ok(start), Ok(end)) = (parse_clock(&window.start), parse_clock(&window.end))
-            else {
-                continue;
-            };
+            let start = parse_clock(&window.start)?;
+            let end = parse_clock(&window.end)?;
             by_weekday.entry(weekday).or_default().push((start, end));
         }
     }
@@ -168,10 +163,10 @@ fn availability_facts(availability: &Availability) -> Vec<SolverAvailability> {
             });
         }
     }
-    facts
+    Ok(facts)
 }
 
-fn cognitive_facts(settings: &PlannerSettings) -> Vec<SolverCognitiveWindow> {
+fn cognitive_facts(settings: &PlannerSettings) -> Result<Vec<SolverCognitiveWindow>, PlannerError> {
     let levels = [
         (
             0,
@@ -194,15 +189,12 @@ fn cognitive_facts(settings: &PlannerSettings) -> Vec<SolverCognitiveWindow> {
     ];
     levels
         .into_iter()
-        .filter_map(|(load, start, end, penalty)| {
-            let (Ok(start), Ok(end)) = (parse_clock(start), parse_clock(end)) else {
-                return None;
-            };
-            Some(SolverCognitiveWindow {
+        .map(|(load, start, end, penalty)| {
+            Ok(SolverCognitiveWindow {
                 id: format!("cognitive:{load}"),
                 load,
-                start,
-                end,
+                start: parse_clock(start)?,
+                end: parse_clock(end)?,
                 outside_penalty: if settings.cognitive_enabled {
                     penalty
                 } else {
@@ -219,10 +211,6 @@ fn load_key(load: &CognitiveLoad) -> usize {
         CognitiveLoad::Medium => 1,
         CognitiveLoad::High => 2,
     }
-}
-
-fn parse_clock(value: &str) -> Result<NaiveTime, ()> {
-    NaiveTime::parse_from_str(value, "%H:%M").map_err(|_| ())
 }
 
 #[cfg(test)]
@@ -242,7 +230,7 @@ mod tests {
             "mon".into(),
             vec![window("09:00", "12:00"), window("10:00", "13:00")],
         )]));
-        let facts = availability_facts(&availability);
+        let facts = availability_facts(&availability).unwrap();
         assert_eq!(facts.len(), 1);
         assert_eq!(facts[0].start, parse_clock("09:00").unwrap());
         assert_eq!(facts[0].end, parse_clock("13:00").unwrap());
@@ -254,6 +242,6 @@ mod tests {
             "mon".into(),
             vec![window("09:00", "12:00"), window("13:00", "17:00")],
         )]));
-        assert_eq!(availability_facts(&availability).len(), 2);
+        assert_eq!(availability_facts(&availability).unwrap().len(), 2);
     }
 }

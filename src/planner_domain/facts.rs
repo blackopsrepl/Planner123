@@ -32,10 +32,6 @@ pub struct SolverBusy {
     /// Inbox task indexes that must start at or after this interval. Populated
     /// for already-applied predecessors.
     pub successors: Vec<usize>,
-    pub event_id: String,
-    pub event_title: String,
-    pub calendar_id: String,
-    pub recurring: bool,
 }
 
 /// One weekly availability window. The loader canonicalizes each weekday into

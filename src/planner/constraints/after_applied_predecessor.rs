@@ -62,10 +62,6 @@ mod tests {
             end: origin() + Duration::minutes(end_offset),
             high: false,
             successors,
-            event_id: "event-0".into(),
-            event_title: "Applied".into(),
-            calendar_id: "cal".into(),
-            recurring: false,
         }
     }
 

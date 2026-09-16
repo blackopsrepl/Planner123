@@ -53,10 +53,6 @@ mod tests {
             end: origin() + Duration::minutes(end_offset),
             high: false,
             successors: Vec::new(),
-            event_id: "event-0".into(),
-            event_title: "Existing".into(),
-            calendar_id: "cal".into(),
-            recurring: false,
         }
     }
 

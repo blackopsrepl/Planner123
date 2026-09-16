@@ -5,10 +5,6 @@ use super::*;
 pub(super) struct BusyOccurrence {
     pub(super) start: DateTime<Utc>,
     pub(super) end: DateTime<Utc>,
-    pub(super) event_id: String,
-    pub(super) event_title: String,
-    pub(super) calendar_id: String,
-    pub(super) recurring: bool,
 }
 
 /// Expands every active event, including recurrences, into horizon occurrences.
@@ -47,10 +43,6 @@ pub(super) fn event_busy_intervals(
         .map(|occurrence_start| BusyOccurrence {
             start: occurrence_start,
             end: occurrence_start + duration,
-            event_id: event.id.clone(),
-            event_title: event.title.clone(),
-            calendar_id: event.calendar_id.clone(),
-            recurring: event.rrule.is_some(),
         })
         .filter(|occurrence| overlaps(occurrence.start, occurrence.end, horizon_start, horizon_end))
         .collect())
@@ -125,7 +117,7 @@ pub(super) fn applied_busy(
 
     let mut stmt = conn
         .prepare(
-            "SELECT t.id, t.cognitive_load, e.id, e.start_at, e.end_at, e.timezone, e.title, e.calendar_id
+            "SELECT t.id, t.cognitive_load, e.id, e.start_at, e.end_at, e.timezone
              FROM planning_tasks t
              JOIN planning_task_events l ON l.task_id = t.id
              JOIN events e ON e.id = l.event_id
@@ -141,8 +133,6 @@ pub(super) fn applied_busy(
                 row.get::<_, String>(3)?,
                 row.get::<_, String>(4)?,
                 row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
-                row.get::<_, String>(7)?,
             ))
         })
         .map_err(internal)?
@@ -150,24 +140,15 @@ pub(super) fn applied_busy(
         .map_err(internal)?;
 
     let mut busy = Vec::new();
-    for (task_id, load, event_id, start_at, end_at, timezone, title, calendar_id) in rows {
-        let (start, end) = match (
-            time::resolve_utc_datetime(&start_at, &timezone),
-            time::resolve_utc_datetime(&end_at, &timezone),
-        ) {
-            (Ok(start), Ok(end)) => (start, end),
-            _ => continue,
-        };
+    for (task_id, load, event_id, start_at, end_at, timezone) in rows {
+        let start = time::resolve_utc_datetime(&start_at, &timezone).map_err(validation)?;
+        let end = time::resolve_utc_datetime(&end_at, &timezone).map_err(validation)?;
         busy.push(SolverBusy {
             id: format!("applied:{event_id}"),
             start,
             end,
             high: load == "high",
             successors: successors.get(&task_id).cloned().unwrap_or_default(),
-            event_id,
-            event_title: title,
-            calendar_id,
-            recurring: false,
         });
     }
     Ok(busy)

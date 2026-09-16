@@ -160,7 +160,7 @@ use database::*;
 use load::*;
 use scheduling::*;
 use settings_validation::{
-    canonical_settings_snapshot, normalize_clock, normalize_timezone, require_task,
+    canonical_settings_snapshot, normalize_clock, normalize_timezone, parse_clock, require_task,
     validate_settings,
 };
 use task_validation::*;

@@ -74,7 +74,13 @@ pub(super) fn proposal_item_from_row(row: &Row<'_>) -> rusqlite::Result<PlannerP
         cognitive_penalty: row.get(6)?,
         fatigue_penalty: row.get(7)?,
         explanation: row.get(8)?,
-        diagnostics: serde_json::from_str(&diagnostics_json).unwrap_or_default(),
+        diagnostics: serde_json::from_str(&diagnostics_json).map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(
+                9,
+                rusqlite::types::Type::Text,
+                Box::new(error),
+            )
+        })?,
     })
 }
 pub(super) fn settings_from_row(row: &Row<'_>) -> rusqlite::Result<PlannerSettings> {
