@@ -63,3 +63,38 @@ fn optimize_produces_a_hard_feasible_future_schedule() {
         );
     }
 }
+
+#[test]
+fn availability_far_out_in_the_horizon_is_still_reachable() {
+    use chrono::Datelike;
+
+    let (_temp, conn, calendar_id) = connection();
+    let target = Utc::now()
+        .date_naive()
+        .checked_add_days(Days::new(3))
+        .unwrap();
+    let weekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        [target.weekday().num_days_from_monday() as usize];
+    update_settings(
+        &conn,
+        SettingsUpdate {
+            timezone: Some("UTC".into()),
+            availability: Some(Availability(BTreeMap::from([(
+                weekday.into(),
+                vec![TimeWindow {
+                    start: "09:00".into(),
+                    end: "17:00".into(),
+                }],
+            )]))),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    create_task(&conn, task(calendar_id, "Far focus")).unwrap();
+
+    let proposal = optimize(&conn, Some(14)).unwrap();
+    assert!(
+        proposal.items[0].scheduled,
+        "a single weekly window inside the horizon must stay schedulable"
+    );
+}
