@@ -1,4 +1,4 @@
-use super::support::{task_row, BusyRows, TimelineRow};
+use super::support::{task_row, AppliedRows, TimelineRow};
 use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
@@ -18,8 +18,8 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
         .project(task_row)
         .merge(
             ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::busy())
-                .project(BusyRows),
+                .for_each(SolverPlan::applied_blocks())
+                .project(AppliedRows),
         )
         .join(joiner::equal(|_: &TimelineRow| ()))
         .filter(|left: &TimelineRow, right: &TimelineRow| violates(left, right))
@@ -33,12 +33,12 @@ fn violates(left: &TimelineRow, right: &TimelineRow) -> bool {
     match (left, right) {
         (
             TimelineRow::Task(task),
-            TimelineRow::Busy {
+            TimelineRow::Applied {
                 end, successors, ..
             },
         )
         | (
-            TimelineRow::Busy {
+            TimelineRow::Applied {
                 end, successors, ..
             },
             TimelineRow::Task(task),
@@ -50,31 +50,21 @@ fn violates(left: &TimelineRow, right: &TimelineRow) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::planner_domain::test_support::{origin, slots, task};
-    use crate::planner_domain::SolverBusy;
-    use chrono::Duration;
+    use crate::planner_domain::test_support::{applied_block, slots, task};
+    use crate::planner_domain::SolverAppliedBlock;
     use solverforge::ConstraintSet;
 
-    fn applied(start_offset: i64, end_offset: i64, successors: Vec<usize>) -> SolverBusy {
-        SolverBusy {
-            id: "applied-0".into(),
-            start: origin() + Duration::minutes(start_offset),
-            end: origin() + Duration::minutes(end_offset),
-            high: false,
-            successors,
-        }
-    }
-
-    fn plan(start_idx: Option<usize>, blocks: Vec<SolverBusy>) -> SolverPlan {
+    fn plan(start_idx: Option<usize>, blocks: Vec<SolverAppliedBlock>) -> SolverPlan {
         let mut task = task(3, 60);
         task.start_idx = start_idx;
-        SolverPlan::new(slots(8), blocks, vec![], vec![], vec![task], 1)
+        SolverPlan::new(slots(8), vec![], blocks, vec![], vec![], vec![task], 1)
     }
 
     #[test]
     fn penalizes_starting_before_the_applied_predecessor_ends() {
         assert_eq!(
-            (constraint(),).evaluate_all(&plan(Some(0), vec![applied(0, 90, vec![0])])),
+            (constraint(),)
+                .evaluate_all(&plan(Some(0), vec![applied_block(0, 90, false, vec![0])])),
             HardMediumSoftScore::of_hard(-1)
         );
     }
@@ -82,11 +72,13 @@ mod tests {
     #[test]
     fn ignores_unrelated_blocks_and_late_starts() {
         assert_eq!(
-            (constraint(),).evaluate_all(&plan(Some(4), vec![applied(0, 90, vec![0])])),
+            (constraint(),)
+                .evaluate_all(&plan(Some(4), vec![applied_block(0, 90, false, vec![0])])),
             HardMediumSoftScore::ZERO
         );
         assert_eq!(
-            (constraint(),).evaluate_all(&plan(Some(0), vec![applied(0, 90, vec![99])])),
+            (constraint(),)
+                .evaluate_all(&plan(Some(0), vec![applied_block(0, 90, false, vec![99])])),
             HardMediumSoftScore::ZERO
         );
     }

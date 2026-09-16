@@ -18,19 +18,35 @@ pub struct SolverSlot {
     pub start: DateTime<Utc>,
 }
 
-/// A blocked interval that no task may overlap: an existing event, a recurring
-/// occurrence, or a previously applied high-load block.
+/// One expanded occurrence of an existing calendar event. Consumed by the
+/// hard overlap rule and by proposal blocker evidence.
 #[problem_fact]
 pub struct SolverBusy {
     #[planning_id]
     pub id: String,
+    /// Calendar event that produced this occurrence; consumed by blocker
+    /// evidence so a proposal can name what blocked a slot.
+    pub event_id: String,
+    pub event_title: String,
+    pub calendar_id: String,
+    /// Whether the occurrence comes from a recurrence expansion.
+    pub recurring: bool,
     pub start: DateTime<Utc>,
     pub end: DateTime<Utc>,
-    /// Whether this interval is a high cognitive-load block from an applied
-    /// proposal. Used only by the recovery preference rules.
+}
+
+/// One previously applied task block, loaded even when it lies outside the
+/// current horizon: inbox successors must still start after it, and high-load
+/// blocks feed the recovery preference.
+#[problem_fact]
+pub struct SolverAppliedBlock {
+    #[planning_id]
+    pub id: String,
+    pub start: DateTime<Utc>,
+    pub end: DateTime<Utc>,
+    /// Whether the applied task carried high cognitive load.
     pub high: bool,
-    /// Inbox task indexes that must start at or after this interval. Populated
-    /// for already-applied predecessors.
+    /// Inbox task indexes that must start at or after this block.
     pub successors: Vec<usize>,
 }
 

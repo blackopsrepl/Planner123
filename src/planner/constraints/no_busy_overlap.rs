@@ -30,8 +30,8 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
 
 fn task_overlaps_busy(left: &TimelineRow, right: &TimelineRow) -> bool {
     match (left, right) {
-        (TimelineRow::Task(task), TimelineRow::Busy { start, end, .. })
-        | (TimelineRow::Busy { start, end, .. }, TimelineRow::Task(task)) => {
+        (TimelineRow::Task(task), TimelineRow::Busy { start, end })
+        | (TimelineRow::Busy { start, end }, TimelineRow::Task(task)) => {
             task.overlaps(*start, *end)
         }
         _ => false,
@@ -49,17 +49,19 @@ mod tests {
     fn busy(start_offset: i64, end_offset: i64) -> SolverBusy {
         SolverBusy {
             id: "busy-0".into(),
+            event_id: "event-0".into(),
+            event_title: "Existing".into(),
+            calendar_id: "cal".into(),
+            recurring: false,
             start: origin() + Duration::minutes(start_offset),
             end: origin() + Duration::minutes(end_offset),
-            high: false,
-            successors: Vec::new(),
         }
     }
 
     fn plan(start_idx: Option<usize>, blocks: Vec<SolverBusy>) -> SolverPlan {
         let mut task = task(3, 60);
         task.start_idx = start_idx;
-        SolverPlan::new(slots(8), blocks, vec![], vec![], vec![task], 1)
+        SolverPlan::new(slots(8), blocks, vec![], vec![], vec![], vec![task], 1)
     }
 
     #[test]

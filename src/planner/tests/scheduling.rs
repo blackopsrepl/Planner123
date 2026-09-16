@@ -80,7 +80,7 @@ fn planner_busy_time_expands_recurrences_through_the_horizon() {
 
     let horizon_start = time::resolve_utc_datetime("2026-03-01 00:00:00", "UTC").unwrap();
     let horizon_end = time::resolve_utc_datetime("2026-05-01 00:00:00", "UTC").unwrap();
-    let starts = busy_intervals(&conn, horizon_start, horizon_end)
+    let starts = busy_occurrences(&conn, horizon_start, horizon_end)
         .unwrap()
         .into_iter()
         .map(|occurrence| occurrence.start.format("%Y-%m-%d %H:%M").to_string())
@@ -134,13 +134,131 @@ fn optimizer_does_not_schedule_over_a_future_recurring_occurrence() {
     );
     event.rrule = Some("FREQ=WEEKLY;COUNT=2".into());
     event_service::save_event(&conn, event, true).unwrap();
-    create_task(&conn, task(calendar_id, "Must not conflict")).unwrap();
+    create_task(&conn, task(calendar_id.clone(), "Must not conflict")).unwrap();
 
     let proposal = optimize(&conn, Some(2)).unwrap();
     assert!(!proposal.items[0].scheduled);
     assert_eq!(
         proposal.items[0].diagnostics.outcome,
-        PlannerProposalOutcome::Unassigned
+        PlannerProposalOutcome::NoHardFeasibleSlot
     );
     assert!(proposal.items[0].explanation.is_some());
+    let blocker = &proposal.items[0].diagnostics.busy_blockers[0];
+    assert!(blocker.recurring);
+    assert_eq!(blocker.event_title, "Recurring conflict");
+    assert_eq!(blocker.calendar_id, calendar_id);
+}
+
+#[test]
+fn unselected_but_individually_feasible_tasks_report_feasible_but_not_selected() {
+    let (_temp, conn, calendar_id) = connection();
+    let target = Utc::now()
+        .date_naive()
+        .checked_add_days(Days::new(1))
+        .unwrap();
+    let weekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        [target.weekday().num_days_from_monday() as usize];
+    update_settings(
+        &conn,
+        SettingsUpdate {
+            timezone: Some("UTC".into()),
+            availability: Some(Availability(BTreeMap::from([(
+                weekday.into(),
+                vec![TimeWindow {
+                    start: "09:00".into(),
+                    end: "10:00".into(),
+                }],
+            )]))),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    create_task(&conn, task(calendar_id.clone(), "Winner")).unwrap();
+    create_task(&conn, task(calendar_id, "Runner up")).unwrap();
+
+    let proposal = optimize(&conn, Some(2)).unwrap();
+    let outcomes: Vec<_> = proposal
+        .items
+        .iter()
+        .map(|item| item.diagnostics.outcome.clone())
+        .collect();
+    assert!(outcomes.contains(&PlannerProposalOutcome::Scheduled));
+    assert!(outcomes.contains(&PlannerProposalOutcome::FeasibleButNotSelected));
+    let loser = proposal
+        .items
+        .iter()
+        .find(|item| item.diagnostics.outcome == PlannerProposalOutcome::FeasibleButNotSelected)
+        .unwrap();
+    assert!(!loser.scheduled);
+    assert!(loser.diagnostics.busy_blockers.is_empty());
+}
+
+#[test]
+fn blocker_evidence_is_bounded_and_reports_the_exact_omitted_count() {
+    let (_temp, conn, calendar_id) = connection();
+    let target = Utc::now()
+        .date_naive()
+        .checked_add_days(Days::new(1))
+        .unwrap();
+    let weekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        [target.weekday().num_days_from_monday() as usize];
+    update_settings(
+        &conn,
+        SettingsUpdate {
+            timezone: Some("UTC".into()),
+            availability: Some(Availability(BTreeMap::from([(
+                weekday.into(),
+                vec![TimeWindow {
+                    start: "09:00".into(),
+                    end: "13:00".into(),
+                }],
+            )]))),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    // Six 40-minute events exactly tile the four-hour availability window, so
+    // no placement escapes them and all six become blocker evidence.
+    for index in 0..6 {
+        let start_minute = 540 + index * 40;
+        let end_minute = start_minute + 40;
+        event_service::save_event(
+            &conn,
+            Event::new(
+                calendar_id.clone(),
+                format!("Block {index}"),
+                format!(
+                    "{target} {:02}:{:02}:00",
+                    start_minute / 60,
+                    start_minute % 60
+                ),
+                format!("{target} {:02}:{:02}:00", end_minute / 60, end_minute % 60),
+                "UTC",
+            ),
+            true,
+        )
+        .unwrap();
+    }
+    create_task(&conn, task(calendar_id, "Fully blocked")).unwrap();
+
+    let proposal = optimize(&conn, Some(2)).unwrap();
+    let diagnostics = &proposal.items[0].diagnostics;
+    assert_eq!(
+        diagnostics.outcome,
+        PlannerProposalOutcome::NoHardFeasibleSlot
+    );
+    assert_eq!(diagnostics.busy_blockers.len(), 5);
+    assert_eq!(diagnostics.busy_blockers_omitted, 1);
+    let starts: Vec<_> = diagnostics
+        .busy_blockers
+        .iter()
+        .map(|blocker| blocker.start_at.clone())
+        .collect();
+    let mut sorted = starts.clone();
+    sorted.sort();
+    assert_eq!(
+        starts, sorted,
+        "blockers must be ordered by occurrence start"
+    );
 }

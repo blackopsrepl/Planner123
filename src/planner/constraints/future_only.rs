@@ -31,7 +31,7 @@ mod tests {
         let mut task = task(3, 60);
         task.start_idx = start_idx;
         task.not_before = origin() + Duration::minutes(not_before_offset_minutes);
-        SolverPlan::new(slots(8), vec![], vec![], vec![], vec![task], 1)
+        SolverPlan::new(slots(8), vec![], vec![], vec![], vec![], vec![task], 1)
     }
 
     #[test]

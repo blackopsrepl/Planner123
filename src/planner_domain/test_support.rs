@@ -3,7 +3,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use chrono_tz::Tz;
 
-use super::{SolverSlot, SolverTask};
+use super::{SolverAppliedBlock, SolverSlot, SolverTask};
 
 /// A fixed Monday origin so grid math is deterministic in tests.
 pub fn origin() -> DateTime<Utc> {
@@ -39,4 +39,20 @@ pub fn slots(count: usize) -> Vec<SolverSlot> {
             start: origin() + chrono::Duration::minutes(index as i64 * 30),
         })
         .collect()
+}
+
+/// An applied task block measured in minutes from the fixed origin.
+pub fn applied_block(
+    start_offset_minutes: i64,
+    end_offset_minutes: i64,
+    high: bool,
+    successors: Vec<usize>,
+) -> SolverAppliedBlock {
+    SolverAppliedBlock {
+        id: format!("applied:{start_offset_minutes}:{end_offset_minutes}"),
+        start: origin() + chrono::Duration::minutes(start_offset_minutes),
+        end: origin() + chrono::Duration::minutes(end_offset_minutes),
+        high,
+        successors,
+    }
 }

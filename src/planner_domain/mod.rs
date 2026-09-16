@@ -10,7 +10,9 @@ solverforge::planning_model! {
     mod task;
     mod plan;
 
-    pub use facts::{SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverSlot};
+    pub use facts::{
+        SolverAppliedBlock, SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverSlot,
+    };
     pub use task::SolverTask;
     pub use plan::{SolverPlan, PLANNER_MANAGER};
 }

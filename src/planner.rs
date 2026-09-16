@@ -19,8 +19,8 @@ use crate::{
         PlanningTask, PlanningTaskState, TaskPriority,
     },
     planner_domain::{
-        SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverPlan, SolverSlot, SolverTask,
-        PLANNER_MANAGER,
+        SolverAppliedBlock, SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverPlan,
+        SolverSlot, SolverTask, PLANNER_MANAGER,
     },
     sync::state,
     time,
@@ -143,6 +143,7 @@ mod applicability;
 mod busy_time;
 pub mod constraints;
 mod database;
+mod diagnostics;
 mod load;
 mod optimization;
 mod proposals;

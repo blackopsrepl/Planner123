@@ -1,24 +1,25 @@
 use crate::planner_domain::{
-    SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverSlot, SolverTask,
+    SolverAppliedBlock, SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverSlot,
+    SolverTask,
 };
 use chrono::{DateTime, NaiveTime, Utc};
 use chrono_tz::Tz;
 use solverforge::prelude::*;
 
 #[derive(Clone)]
-pub(super) struct TaskInterval {
-    pub index: usize,
-    pub start: DateTime<Utc>,
-    pub end: DateTime<Utc>,
-    pub load: usize,
-    pub depends_on: Vec<usize>,
-    pub timezone: Tz,
-    pub recovery_minutes: i64,
-    pub excess_high_penalty: i64,
+pub(crate) struct TaskInterval {
+    pub(super) index: usize,
+    pub(crate) start: DateTime<Utc>,
+    pub(crate) end: DateTime<Utc>,
+    pub(super) load: usize,
+    pub(super) depends_on: Vec<usize>,
+    pub(super) timezone: Tz,
+    pub(super) recovery_minutes: i64,
+    pub(super) excess_high_penalty: i64,
 }
 
 impl TaskInterval {
-    pub fn new(task: &SolverTask, slot: &SolverSlot) -> Self {
+    pub(crate) fn new(task: &SolverTask, slot: &SolverSlot) -> Self {
         Self {
             index: task.index,
             start: slot.start,
@@ -31,7 +32,7 @@ impl TaskInterval {
         }
     }
 
-    pub fn overlaps(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> bool {
+    pub(crate) fn overlaps(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> bool {
         self.start < end && start < self.end
     }
 
@@ -55,6 +56,10 @@ impl TaskInterval {
 pub(super) enum TimelineRow {
     Task(TaskInterval),
     Busy {
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    },
+    Applied {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
         high: bool,
@@ -90,8 +95,25 @@ impl Projection<SolverBusy> for BusyRows {
         sink.emit(TimelineRow::Busy {
             start: busy.start,
             end: busy.end,
-            high: busy.high,
-            successors: busy.successors.clone(),
+        });
+    }
+}
+
+pub(super) struct AppliedRows;
+
+impl Projection<SolverAppliedBlock> for AppliedRows {
+    type Out = TimelineRow;
+    const MAX_EMITS: usize = 1;
+
+    fn project<Sink>(&self, block: &SolverAppliedBlock, sink: &mut Sink)
+    where
+        Sink: ProjectionSink<Self::Out>,
+    {
+        sink.emit(TimelineRow::Applied {
+            start: block.start,
+            end: block.end,
+            high: block.high,
+            successors: block.successors.clone(),
         });
     }
 }

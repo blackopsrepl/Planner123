@@ -91,7 +91,7 @@ mod tests {
     fn plan(start_idx: Option<usize>, windows: Vec<SolverCognitiveWindow>) -> SolverPlan {
         let mut task = task(3, 60);
         task.start_idx = start_idx;
-        SolverPlan::new(slots(24), vec![], vec![], windows, vec![task], 1)
+        SolverPlan::new(slots(24), vec![], vec![], vec![], windows, vec![task], 1)
     }
 
     #[test]
@@ -106,6 +106,7 @@ mod tests {
         task.start_idx = Some(46);
         let plan = SolverPlan::new(
             slots(48),
+            vec![],
             vec![],
             vec![],
             vec![window((10, 0), (12, 0), 2)],

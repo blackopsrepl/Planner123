@@ -53,6 +53,7 @@ mod tests {
             vec![],
             vec![],
             vec![],
+            vec![],
             vec![predecessor, successor],
             1,
         )

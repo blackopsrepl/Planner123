@@ -8,6 +8,9 @@ use solverforge::prelude::*;
 
 pub use self::assemble::create_constraints;
 
+pub(crate) use self::inside_availability::fully_covered;
+pub(crate) use self::support::TaskInterval;
+
 mod assign_priority;
 mod support;
 mod future_only;

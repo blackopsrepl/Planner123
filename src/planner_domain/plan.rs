@@ -8,7 +8,10 @@ use std::sync::LazyLock;
 
 use solverforge::{prelude::*, SolverConfig, SolverManager};
 
-use super::{SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverSlot, SolverTask};
+use super::{
+    SolverAppliedBlock, SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverSlot,
+    SolverTask,
+};
 
 /// Full planning solution passed to the solver runtime.
 #[planning_solution(
@@ -23,6 +26,9 @@ pub struct SolverPlan {
     /// Intervals no task may overlap.
     #[problem_fact_collection]
     pub busy: Vec<SolverBusy>,
+    /// Previously applied task blocks that constrain ordering and recovery.
+    #[problem_fact_collection]
+    pub applied_blocks: Vec<SolverAppliedBlock>,
     /// Raw weekly availability windows.
     #[problem_fact_collection]
     pub availability: Vec<SolverAvailability>,
@@ -43,6 +49,7 @@ impl SolverPlan {
     pub fn new(
         slots: Vec<SolverSlot>,
         busy: Vec<SolverBusy>,
+        applied_blocks: Vec<SolverAppliedBlock>,
         availability: Vec<SolverAvailability>,
         cognitive_windows: Vec<SolverCognitiveWindow>,
         tasks: Vec<SolverTask>,
@@ -51,6 +58,7 @@ impl SolverPlan {
         let mut plan = Self {
             slots,
             busy,
+            applied_blocks,
             availability,
             cognitive_windows,
             tasks,
@@ -86,7 +94,15 @@ mod tests {
 
     #[test]
     fn rebuild_filters_out_of_range_assignments() {
-        let mut plan = SolverPlan::new(slots(4), vec![], vec![], vec![], vec![task(3, 60)], 1);
+        let mut plan = SolverPlan::new(
+            slots(4),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![task(3, 60)],
+            1,
+        );
         plan.tasks[0].start_idx = Some(99);
         plan.rebuild_derived_fields();
         assert_eq!(plan.tasks[0].start_idx, None);

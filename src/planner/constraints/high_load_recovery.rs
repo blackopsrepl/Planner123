@@ -55,7 +55,15 @@ mod tests {
         second.index = 1;
         second.load = loads[1];
         second.start_idx = start_idxs[1];
-        SolverPlan::new(slots(8), vec![], vec![], vec![], vec![first, second], 1)
+        SolverPlan::new(
+            slots(8),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![first, second],
+            1,
+        )
     }
 
     #[test]

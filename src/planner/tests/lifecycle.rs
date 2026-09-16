@@ -55,7 +55,7 @@ fn planner_rejects_invalid_recurrence_instead_of_ignoring_busy_time() {
     event.rrule = Some("FREQ=NOT_A_FREQUENCY".into());
     event_service::save_event(&conn, event, true).unwrap();
 
-    let error = busy_intervals(
+    let error = busy_occurrences(
         &conn,
         time::resolve_utc_datetime("2026-03-01 00:00:00", "UTC").unwrap(),
         time::resolve_utc_datetime("2026-04-01 00:00:00", "UTC").unwrap(),
@@ -72,6 +72,30 @@ fn task_dependencies_reject_cycles() {
     let second = create_task(&conn, task(calendar_id, "Second")).unwrap();
     add_dependency(&conn, &first.id, &second.id).unwrap();
     assert!(add_dependency(&conn, &second.id, &first.id).is_err());
+}
+
+#[test]
+fn optimize_conflicts_when_an_applied_predecessor_loses_its_event() {
+    let (_temp, conn, calendar_id) = connection();
+    configure_utc_workweek(&conn);
+    let predecessor = create_task(&conn, task(calendar_id.clone(), "Applied predecessor")).unwrap();
+    let first_proposal = optimize(&conn, None).unwrap();
+    apply_proposal(&conn, &first_proposal.proposal.id).unwrap();
+
+    let successor = create_task(&conn, task(calendar_id, "Successor")).unwrap();
+    add_dependency(&conn, &predecessor.id, &successor.id).unwrap();
+    let event_id: String = conn
+        .query_row(
+            "SELECT event_id FROM planning_task_events WHERE task_id=?1",
+            [&predecessor.id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    event_service::delete_event(&conn, &event_id).unwrap();
+
+    let error = optimize(&conn, None).unwrap_err();
+    assert!(matches!(error, PlannerError::Conflict(_)));
+    assert!(error.to_string().contains("no active event"));
 }
 
 #[test]

@@ -1,5 +1,5 @@
 use super::support::{clock_contains, task_row, AvailabilityRows, TaskInterval, TimelineRow};
-use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
+use crate::planner_domain::{SolverAvailability, SolverPlan, SolverSlot, SolverTask};
 use chrono::{Datelike, Duration};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
@@ -64,6 +64,18 @@ fn covered_minutes(left: &TimelineRow, right: &TimelineRow) -> i64 {
     }
 }
 
+/// Whether every minute of the interval lies inside the canonical availability
+/// union. Shares the scoring rule's per-minute coverage definition so proposal
+/// diagnostics can never disagree with the solver about feasibility.
+pub(crate) fn fully_covered(interval: &TaskInterval, availability: &[SolverAvailability]) -> bool {
+    let duration = (interval.end - interval.start).num_minutes();
+    availability
+        .iter()
+        .map(|window| task_covered_minutes(interval, window.weekday, window.start, window.end))
+        .sum::<i64>()
+        == duration
+}
+
 fn task_covered_minutes(
     task: &TaskInterval,
     weekday: u32,
@@ -101,7 +113,7 @@ mod tests {
     fn plan(start_idx: Option<usize>, windows: Vec<SolverAvailability>) -> SolverPlan {
         let mut task = task(3, 60);
         task.start_idx = start_idx;
-        SolverPlan::new(slots(48), vec![], windows, vec![], vec![task], 1)
+        SolverPlan::new(slots(48), vec![], vec![], windows, vec![], vec![task], 1)
     }
 
     fn score(plan: &SolverPlan) -> HardMediumSoftScore {

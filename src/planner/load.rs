@@ -17,11 +17,17 @@ pub(super) struct SolverInputs<'a> {
     pub tasks: &'a [PlanningTask],
 }
 
+/// The planning solution plus the horizon bound it was built against.
+pub(super) struct BuiltPlan {
+    pub plan: SolverPlan,
+    pub horizon_end: DateTime<Utc>,
+}
+
 /// Builds the planning solution from persisted state.
 pub(super) fn build_plan(
     conn: &Connection,
     inputs: &SolverInputs<'_>,
-) -> Result<SolverPlan, PlannerError> {
+) -> Result<BuiltPlan, PlannerError> {
     let settings = inputs.settings;
     let now = Utc::now();
     let local_now = now.with_timezone(&inputs.timezone);
@@ -45,35 +51,33 @@ pub(super) fn build_plan(
 
     let dependencies = list_dependencies(conn)?;
     let dependency_map = dependency_map(conn, inputs.tasks)?;
-    let mut busy = existing_busy(conn, origin, horizon_end)?;
-    busy.extend(applied_busy(conn, inputs.tasks, &dependencies)?);
-
-    Ok(SolverPlan::new(
-        slots,
-        busy,
-        availability_facts(inputs.availability)?,
-        cognitive_facts(settings)?,
-        build_tasks(inputs, now, &dependency_map)?,
-        settings.solve_seconds as u64,
-    ))
-}
-
-fn existing_busy(
-    conn: &Connection,
-    horizon_start: DateTime<Utc>,
-    horizon_end: DateTime<Utc>,
-) -> Result<Vec<SolverBusy>, PlannerError> {
-    Ok(busy_intervals(conn, horizon_start, horizon_end)?
+    let busy = busy_occurrences(conn, origin, horizon_end)?
         .into_iter()
         .enumerate()
         .map(|(index, occurrence)| SolverBusy {
-            id: format!("busy:{index}"),
+            id: format!("busy:{index}:{}", occurrence.event_id),
+            event_id: occurrence.event_id,
+            event_title: occurrence.event_title,
+            calendar_id: occurrence.calendar_id,
+            recurring: occurrence.recurring,
             start: occurrence.start,
             end: occurrence.end,
-            high: false,
-            successors: Vec::new(),
         })
-        .collect())
+        .collect();
+    let applied_blocks = applied_blocks(conn, inputs.tasks, &dependencies)?;
+
+    Ok(BuiltPlan {
+        plan: SolverPlan::new(
+            slots,
+            busy,
+            applied_blocks,
+            availability_facts(inputs.availability)?,
+            cognitive_facts(settings)?,
+            build_tasks(inputs, now, &dependency_map)?,
+            settings.solve_seconds as u64,
+        ),
+        horizon_end,
+    })
 }
 
 fn build_tasks(

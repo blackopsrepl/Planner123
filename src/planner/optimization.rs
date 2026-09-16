@@ -47,7 +47,9 @@ pub fn optimize(
         availability: &availability,
         tasks: &tasks,
     };
-    let solved = solve(build_plan(conn, &inputs)?)?;
+    let built = build_plan(conn, &inputs)?;
+    let horizon_end = built.horizon_end;
+    let solved = solve(built.plan)?;
     let penalties = task_penalties(&solved);
 
     let proposal_id = Uuid::new_v4().to_string();
@@ -97,6 +99,16 @@ pub fn optimize(
             None => (None, None),
         };
         let entry = penalties.get(&task.index).cloned().unwrap_or_default();
+        let evidence = if selected.is_some() {
+            diagnostics::UnscheduledEvidence {
+                outcome: PlannerProposalOutcome::Scheduled,
+                busy_blockers: Vec::new(),
+                busy_blockers_omitted: 0,
+            }
+        } else {
+            diagnostics::classify(&solved, horizon_end, task.index)
+        };
+        let explanation = explanation(selected.is_some(), &entry, &evidence.outcome);
         let item = PlannerProposalItem {
             id: Uuid::new_v4().to_string(),
             proposal_id: proposal_id.clone(),
@@ -106,15 +118,11 @@ pub fn optimize(
             scheduled: selected.is_some(),
             cognitive_penalty: entry.cognitive,
             fatigue_penalty: entry.fatigue,
-            explanation: explanation(selected.is_some(), &entry),
+            explanation,
             diagnostics: PlannerProposalDiagnostics {
-                outcome: if selected.is_some() {
-                    PlannerProposalOutcome::Scheduled
-                } else {
-                    PlannerProposalOutcome::Unassigned
-                },
-                busy_blockers: Vec::new(),
-                busy_blockers_omitted: 0,
+                outcome: evidence.outcome,
+                busy_blockers: evidence.busy_blockers,
+                busy_blockers_omitted: evidence.busy_blockers_omitted,
             },
         };
         persist_item(conn, &item)?;
@@ -171,9 +179,22 @@ fn contribution(
     (soft(counterfactual) - soft(baseline)).max(0)
 }
 
-fn explanation(scheduled: bool, entry: &TaskPenalties) -> Option<String> {
+fn explanation(
+    scheduled: bool,
+    entry: &TaskPenalties,
+    outcome: &PlannerProposalOutcome,
+) -> Option<String> {
     if !scheduled {
-        return Some("Not scheduled: left unassigned within the configured horizon.".into());
+        return match outcome {
+            PlannerProposalOutcome::NoHardFeasibleSlot => {
+                Some("No hard-feasible slot within the configured horizon.".into())
+            }
+            PlannerProposalOutcome::FeasibleButNotSelected => Some(
+                "Hard-feasible slots exist, but the optimizer could not select one with the other tasks."
+                    .into(),
+            ),
+            _ => Some("Not scheduled within the configured horizon.".into()),
+        };
     }
     if entry.fatigue > 0 {
         return Some("High cognitive-load recovery gap below the configured minimum.".into());

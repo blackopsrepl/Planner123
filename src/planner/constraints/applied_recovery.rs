@@ -1,4 +1,4 @@
-use super::support::{task_row, BusyRows, TimelineRow};
+use super::support::{task_row, AppliedRows, TimelineRow};
 use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
@@ -18,8 +18,8 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
         .project(task_row)
         .merge(
             ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::busy())
-                .project(BusyRows),
+                .for_each(SolverPlan::applied_blocks())
+                .project(AppliedRows),
         )
         .join(joiner::equal(|_: &TimelineRow| ()))
         .filter(|left: &TimelineRow, right: &TimelineRow| violates(left, right))
@@ -33,12 +33,12 @@ fn violates(left: &TimelineRow, right: &TimelineRow) -> bool {
     match (left, right) {
         (
             TimelineRow::Task(task),
-            TimelineRow::Busy {
+            TimelineRow::Applied {
                 start, end, high, ..
             },
         )
         | (
-            TimelineRow::Busy {
+            TimelineRow::Applied {
                 start, end, high, ..
             },
             TimelineRow::Task(task),
@@ -49,8 +49,8 @@ fn violates(left: &TimelineRow, right: &TimelineRow) -> bool {
 
 fn penalty(left: &TimelineRow, right: &TimelineRow) -> i64 {
     match (left, right) {
-        (TimelineRow::Task(task), TimelineRow::Busy { .. })
-        | (TimelineRow::Busy { .. }, TimelineRow::Task(task)) => task.excess_high_penalty,
+        (TimelineRow::Task(task), TimelineRow::Applied { .. })
+        | (TimelineRow::Applied { .. }, TimelineRow::Task(task)) => task.excess_high_penalty,
         _ => 0,
     }
 }
@@ -58,32 +58,25 @@ fn penalty(left: &TimelineRow, right: &TimelineRow) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::planner_domain::test_support::{origin, slots, task};
-    use crate::planner_domain::SolverBusy;
-    use chrono::Duration;
+    use crate::planner_domain::test_support::{applied_block, slots, task};
+    use crate::planner_domain::SolverAppliedBlock;
     use solverforge::ConstraintSet;
 
-    fn block(start_offset: i64, end_offset: i64, high: bool) -> SolverBusy {
-        SolverBusy {
-            id: "block-0".into(),
-            start: origin() + Duration::minutes(start_offset),
-            end: origin() + Duration::minutes(end_offset),
-            high,
-            successors: Vec::new(),
-        }
-    }
-
-    fn plan(load: usize, start_idx: Option<usize>, blocks: Vec<SolverBusy>) -> SolverPlan {
+    fn plan(load: usize, start_idx: Option<usize>, blocks: Vec<SolverAppliedBlock>) -> SolverPlan {
         let mut task = task(3, 60);
         task.load = load;
         task.start_idx = start_idx;
-        SolverPlan::new(slots(8), blocks, vec![], vec![], vec![task], 1)
+        SolverPlan::new(slots(8), vec![], blocks, vec![], vec![], vec![task], 1)
     }
 
     #[test]
     fn penalizes_high_load_task_too_soon_after_applied_block() {
         assert_eq!(
-            (constraint(),).evaluate_all(&plan(2, Some(2), vec![block(0, 60, true)])),
+            (constraint(),).evaluate_all(&plan(
+                2,
+                Some(2),
+                vec![applied_block(0, 60, true, vec![])]
+            )),
             HardMediumSoftScore::of_soft(-5)
         );
     }
@@ -91,11 +84,19 @@ mod tests {
     #[test]
     fn ignores_low_load_and_non_high_blocks() {
         assert_eq!(
-            (constraint(),).evaluate_all(&plan(1, Some(2), vec![block(0, 60, true)])),
+            (constraint(),).evaluate_all(&plan(
+                1,
+                Some(2),
+                vec![applied_block(0, 60, true, vec![])]
+            )),
             HardMediumSoftScore::ZERO
         );
         assert_eq!(
-            (constraint(),).evaluate_all(&plan(2, Some(2), vec![block(0, 60, false)])),
+            (constraint(),).evaluate_all(&plan(
+                2,
+                Some(2),
+                vec![applied_block(0, 60, false, vec![])]
+            )),
             HardMediumSoftScore::ZERO
         );
     }
