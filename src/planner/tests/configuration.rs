@@ -58,3 +58,24 @@ fn availability_requires_known_days_and_forward_time_windows() {
         "availability on 'mon' must end after it starts"
     );
 }
+
+#[test]
+fn priority_weights_must_be_positive_and_ordered() {
+    let (_temp, conn, _) = connection();
+    for update in [
+        SettingsUpdate {
+            priority_low_weight: Some(0),
+            ..Default::default()
+        },
+        SettingsUpdate {
+            priority_low_weight: Some(10),
+            priority_normal_weight: Some(5),
+            ..Default::default()
+        },
+    ] {
+        assert_eq!(
+            update_settings(&conn, update).unwrap_err().to_string(),
+            "priority weights must be positive and ordered low <= normal <= high"
+        );
+    }
+}

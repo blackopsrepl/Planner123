@@ -8,6 +8,7 @@ use solverforge::prelude::*;
 
 pub use self::assemble::create_constraints;
 
+pub(crate) use self::assign_priority::scale_assignment_penalties;
 pub(crate) use self::cognitive_window::minutes_outside;
 pub(crate) use self::high_load_recovery::recovery_penalty;
 pub(crate) use self::inside_availability::fully_covered;

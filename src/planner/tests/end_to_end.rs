@@ -115,6 +115,43 @@ fn soft_deadline_ontime_placement_wins_over_the_preferred_window() {
 }
 
 #[test]
+fn hard_feasible_late_task_is_preferred_over_leaving_it_unassigned() {
+    let (_temp, conn, calendar_id) = connection();
+    let target = Utc::now()
+        .date_naive()
+        .checked_add_days(Days::new(1))
+        .unwrap();
+    let weekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        [target.weekday().num_days_from_monday() as usize];
+    update_settings(
+        &conn,
+        SettingsUpdate {
+            timezone: Some("UTC".into()),
+            availability: Some(Availability(BTreeMap::from([(
+                weekday.into(),
+                vec![TimeWindow {
+                    start: "10:00".into(),
+                    end: "11:00".into(),
+                }],
+            )]))),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut input = task(calendar_id, "Late but schedulable");
+    input.deadline_kind = DeadlineKind::Soft;
+    input.deadline_at = Some(format!("{target} 09:00:00"));
+    create_task(&conn, input).unwrap();
+
+    let proposal = optimize(&conn, Some(2)).unwrap();
+    assert!(proposal.items[0].scheduled);
+    assert_eq!(
+        proposal.items[0].diagnostics.outcome,
+        PlannerProposalOutcome::Scheduled
+    );
+}
+
+#[test]
 fn item_penalties_reconcile_additively_with_the_recovery_score() {
     let (_temp, conn, calendar_id) = connection();
     let target = Utc::now()

@@ -17,8 +17,8 @@ pub struct SolverTask {
     pub task_id: String,
     pub index: usize,
     pub duration_minutes: i64,
-    /// Priority weight from planner settings; scales the medium assignment
-    /// penalty so high-priority tasks are scheduled first.
+    /// Medium assignment penalty derived from priority and scaled above all
+    /// possible soft-deadline lateness in this solve.
     pub priority_weight: i64,
     /// Load-level key: 0 low, 1 medium, 2 high.
     pub load: usize,

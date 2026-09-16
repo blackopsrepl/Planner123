@@ -83,9 +83,6 @@ pub(super) fn validate_settings(value: &PlannerSettings) -> Result<(), PlannerEr
         ));
     }
     if [
-        value.priority_low_weight,
-        value.priority_normal_weight,
-        value.priority_high_weight,
         value.low_outside_penalty,
         value.medium_outside_penalty,
         value.high_outside_penalty,
@@ -96,6 +93,14 @@ pub(super) fn validate_settings(value: &PlannerSettings) -> Result<(), PlannerEr
     {
         return Err(PlannerError::Validation(
             "planner weights cannot be negative".into(),
+        ));
+    }
+    if value.priority_low_weight < 1
+        || value.priority_low_weight > value.priority_normal_weight
+        || value.priority_normal_weight > value.priority_high_weight
+    {
+        return Err(PlannerError::Validation(
+            "priority weights must be positive and ordered low <= normal <= high".into(),
         ));
     }
     if value.high_streak_limit < 1 || value.recovery_minutes < 0 {

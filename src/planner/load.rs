@@ -6,6 +6,7 @@
 //! intervals, and task entities. Every rule that decides legality or quality
 //! lives in `crate::planner::constraints`.
 
+use super::constraints::scale_assignment_penalties;
 use super::*;
 
 /// Everything the loader needs from the database, already validated.
@@ -74,7 +75,7 @@ pub(super) fn build_plan(
             applied,
             availability_facts(inputs.availability)?,
             cognitive_facts(settings)?,
-            build_tasks(inputs, now, &dependency_map, &applied_ends)?,
+            build_tasks(inputs, now, horizon_end, &dependency_map, &applied_ends)?,
             settings.solve_seconds as u64,
         ),
         horizon_end,
@@ -92,11 +93,12 @@ fn applied_recovery_ends(applied: &[SolverAppliedBlock]) -> Vec<DateTime<Utc>> {
 fn build_tasks(
     inputs: &SolverInputs<'_>,
     now: DateTime<Utc>,
+    horizon_end: DateTime<Utc>,
     dependency_map: &HashMap<String, Vec<usize>>,
     applied_ends: &[DateTime<Utc>],
 ) -> Result<Vec<SolverTask>, PlannerError> {
     let settings = inputs.settings;
-    inputs
+    let mut tasks = inputs
         .tasks
         .iter()
         .enumerate()
@@ -141,7 +143,9 @@ fn build_tasks(
                 start_idx: None,
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>, PlannerError>>()?;
+    scale_assignment_penalties(&mut tasks, horizon_end)?;
+    Ok(tasks)
 }
 
 /// Canonicalizes weekly windows into disjoint per-weekday intervals. The
