@@ -12,14 +12,17 @@ CROSS := ✗
 ARROW := ▸
 
 VERSION := $(shell grep -m1 '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+CARGO_HOME ?= $(HOME)/.cargo
 
-.PHONY: help build build-release run run-cli test lint fmt fmt-check clippy ci-local pre-release clean version
+.PHONY: help build build-release install uninstall run run-cli test lint fmt fmt-check clippy ci-local pre-release clean version
 .DEFAULT_GOAL := help
 
 help:
 	@printf "$(CYAN)$(BOLD)SolverForge Calendar$(RESET) v$(VERSION)\n\n"
 	@printf "$(ARROW) build          Build the TUI and CLI binaries\n"
 	@printf "$(ARROW) build-release  Build optimized binaries\n"
+	@printf "$(ARROW) install        Install both binaries into $(CARGO_HOME)/bin\n"
+	@printf "$(ARROW) uninstall      Remove both installed binaries\n"
 	@printf "$(ARROW) run            Launch the TUI\n"
 	@printf "$(ARROW) run-cli        Run the agent CLI, pass ARGS='...'\n"
 	@printf "$(ARROW) test           Run the full test suite\n"
@@ -39,6 +42,14 @@ build:
 build-release:
 	@printf "$(ARROW) Building release binaries...\n"
 	@cargo build --release --bins && printf "$(GREEN)$(CHECK) Release build passed$(RESET)\n" || (printf "$(RED)$(CROSS) Release build failed$(RESET)\n" && exit 1)
+
+install:
+	@printf "$(ARROW) Installing solverforge-calendar and solverforge-calendar-cli into $(CARGO_HOME)/bin...\n"
+	@cargo install --path . --locked --bins --force && printf "$(GREEN)$(CHECK) Install passed$(RESET)\n" || (printf "$(RED)$(CROSS) Install failed$(RESET)\n" && exit 1)
+
+uninstall:
+	@printf "$(ARROW) Removing installed binaries from $(CARGO_HOME)/bin...\n"
+	@cargo uninstall solverforge-calendar && printf "$(GREEN)$(CHECK) Uninstall passed$(RESET)\n" || (printf "$(RED)$(CROSS) Uninstall failed$(RESET)\n" && exit 1)
 
 run:
 	@cargo run
