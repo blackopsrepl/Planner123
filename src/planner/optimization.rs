@@ -1,8 +1,7 @@
 use super::*;
 
-use std::collections::BTreeMap;
-
-use solverforge::{Analyzable, HardMediumSoftScore, ScoreAnalysis};
+use super::constraints::{minutes_outside, names, TaskInterval};
+use solverforge::Analyzable;
 
 /// Runs one optimization and persists a proposal. Nothing else is mutated.
 pub fn optimize(
@@ -50,7 +49,7 @@ pub fn optimize(
     let built = build_plan(conn, &inputs)?;
     let horizon_end = built.horizon_end;
     let solved = solve(built.plan)?;
-    let penalties = task_penalties(&solved);
+    let penalties = task_penalties(&solved)?;
 
     let proposal_id = Uuid::new_v4().to_string();
     let horizon_start = solved
@@ -98,7 +97,7 @@ pub fn optimize(
             ),
             None => (None, None),
         };
-        let entry = penalties.get(&task.index).cloned().unwrap_or_default();
+        let entry = &penalties[task.index];
         let evidence = if selected.is_some() {
             diagnostics::UnscheduledEvidence {
                 outcome: PlannerProposalOutcome::Scheduled,
@@ -108,7 +107,7 @@ pub fn optimize(
         } else {
             diagnostics::classify(&solved, horizon_end, task.index)
         };
-        let explanation = explanation(selected.is_some(), &entry, &evidence.outcome);
+        let explanation = explanation(selected.is_some(), entry, &evidence.outcome);
         let item = PlannerProposalItem {
             id: Uuid::new_v4().to_string(),
             proposal_id: proposal_id.clone(),
@@ -136,47 +135,87 @@ pub fn optimize(
     })
 }
 
-/// Per-task soft penalties recovered from framework score analysis.
+/// Per-task soft penalties, owned by the task the scoring rule charges:
+/// cognitive cost belongs to the task sitting outside its window, and
+/// recovery cost belongs to the later task of a violating pair or the task
+/// whose applied-block pressure reaches the streak limit.
 #[derive(Clone, Default)]
 struct TaskPenalties {
     cognitive: i64,
     fatigue: i64,
 }
 
-fn task_penalties(plan: &SolverPlan) -> BTreeMap<usize, TaskPenalties> {
-    let baseline = plan.analyze();
-    let mut map: BTreeMap<usize, TaskPenalties> = BTreeMap::new();
-    for task in plan.tasks.iter().filter(|task| task.start_idx.is_some()) {
-        let mut without = plan.clone();
-        without.tasks[task.index].start_idx = None;
-        let counterfactual = without.analyze();
-        let cognitive = contribution(&baseline, &counterfactual, "Prefer cognitive windows");
-        let fatigue = contribution(&baseline, &counterfactual, "High cognitive-load recovery")
-            + contribution(
-                &baseline,
-                &counterfactual,
-                "Applied high cognitive-load recovery",
-            );
-        if cognitive > 0 || fatigue > 0 {
-            map.insert(task.index, TaskPenalties { cognitive, fatigue });
-        }
+/// Computes penalties for every scheduled task from the same predicates the
+/// scoring rules use, then proves the totals reconcile with the solver's own
+/// score analysis before anything is persisted.
+fn task_penalties(plan: &SolverPlan) -> Result<Vec<TaskPenalties>, PlannerError> {
+    let intervals: Vec<Option<TaskInterval>> = plan
+        .tasks
+        .iter()
+        .map(|task| {
+            task.start_idx
+                .map(|index| TaskInterval::new(task, &plan.slots[index]))
+        })
+        .collect();
+
+    let mut penalties = vec![TaskPenalties::default(); plan.tasks.len()];
+    for (index, interval) in intervals.iter().enumerate() {
+        let Some(interval) = interval else { continue };
+        let cognitive = plan
+            .cognitive_windows
+            .iter()
+            .find(|window| window.load == plan.tasks[index].load && window.outside_penalty > 0)
+            .map_or(0, |window| {
+                minutes_outside(interval, window.start, window.end) * window.outside_penalty
+            });
+        // The recovery rule charges the target per violating predecessor, so
+        // item penalties repeat the target's weight for each one.
+        let inbox_fatigue: i64 = intervals
+            .iter()
+            .flatten()
+            .filter(|predecessor| {
+                predecessor.index != interval.index
+                    && interval.gap_recovers(predecessor.end, predecessor.is_high())
+            })
+            .map(|_| interval.excess_high_penalty)
+            .sum();
+        let fatigue = if interval.applied_recovery_pressure() >= interval.high_streak_limit as usize
+        {
+            inbox_fatigue + interval.excess_high_penalty
+        } else {
+            inbox_fatigue
+        };
+        penalties[index] = TaskPenalties { cognitive, fatigue };
     }
-    map
+
+    reconcile_with_analysis(plan, &penalties)?;
+    Ok(penalties)
 }
 
-fn contribution(
-    baseline: &ScoreAnalysis<HardMediumSoftScore>,
-    counterfactual: &ScoreAnalysis<HardMediumSoftScore>,
-    name: &str,
-) -> i64 {
-    let soft = |analysis: &ScoreAnalysis<HardMediumSoftScore>| {
+/// Proves per-item penalties are additive with the solver's aggregate score so
+/// proposal output can never disagree with the model that produced it.
+fn reconcile_with_analysis(
+    plan: &SolverPlan,
+    penalties: &[TaskPenalties],
+) -> Result<(), PlannerError> {
+    let analysis = plan.analyze();
+    let soft = |name: &str| {
         analysis
             .constraints
             .iter()
             .find(|constraint| constraint.name == name)
             .map_or(0, |constraint| constraint.score.soft())
     };
-    (soft(counterfactual) - soft(baseline)).max(0)
+    let cognitive_total: i64 = penalties.iter().map(|penalty| penalty.cognitive).sum();
+    let fatigue_total: i64 = penalties.iter().map(|penalty| penalty.fatigue).sum();
+    let expected_cognitive = -soft(names::COGNITIVE_WINDOWS);
+    let expected_fatigue = -(soft(names::INBOX_RECOVERY) + soft(names::APPLIED_RECOVERY));
+    if cognitive_total != expected_cognitive || fatigue_total != expected_fatigue {
+        return Err(PlannerError::Internal(format!(
+            "proposal penalties do not reconcile with score analysis: cognitive {cognitive_total} vs {expected_cognitive}, fatigue {fatigue_total} vs {expected_fatigue}"
+        )));
+    }
+    Ok(())
 }
 
 fn explanation(

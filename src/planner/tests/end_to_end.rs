@@ -115,6 +115,52 @@ fn soft_deadline_ontime_placement_wins_over_the_preferred_window() {
 }
 
 #[test]
+fn item_penalties_reconcile_additively_with_the_recovery_score() {
+    let (_temp, conn, calendar_id) = connection();
+    let target = Utc::now()
+        .date_naive()
+        .checked_add_days(Days::new(1))
+        .unwrap();
+    let weekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        [target.weekday().num_days_from_monday() as usize];
+    update_settings(
+        &conn,
+        SettingsUpdate {
+            timezone: Some("UTC".into()),
+            availability: Some(Availability(BTreeMap::from([(
+                weekday.into(),
+                vec![TimeWindow {
+                    start: "09:00".into(),
+                    end: "12:00".into(),
+                }],
+            )]))),
+            recovery_minutes: Some(150),
+            excess_high_penalty: Some(7),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    for title in ["H1", "H2", "H3"] {
+        let mut input = task(calendar_id.clone(), title);
+        input.duration_minutes = 60;
+        input.cognitive_load = CognitiveLoad::High;
+        create_task(&conn, input).unwrap();
+    }
+
+    // The three-hour window forces the tasks back to back, so the last task
+    // violates against two predecessors and the score carries three pair
+    // penalties: 7 for H2, 14 for H3.
+    let proposal = optimize(&conn, Some(2)).unwrap();
+    assert_eq!(
+        proposal.proposal.score.as_deref(),
+        Some("0hard/0medium/-21soft")
+    );
+    let fatigue_total: i64 = proposal.items.iter().map(|item| item.fatigue_penalty).sum();
+    assert_eq!(fatigue_total, 21);
+}
+
+#[test]
 fn availability_far_out_in_the_horizon_is_still_reachable() {
     use chrono::Datelike;
 

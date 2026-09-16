@@ -19,7 +19,7 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
         .project(task_row)
         .filter(|row: &TimelineRow| violation_penalty(row) > 0)
         .penalize(|row: &TimelineRow| HardMediumSoftScore::of_soft(violation_penalty(row)))
-        .named("Applied high cognitive-load recovery")
+        .named(super::names::APPLIED_RECOVERY)
 }
 
 /// The excess penalty a row's task owes for violating applied recovery, or

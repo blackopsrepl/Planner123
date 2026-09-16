@@ -8,15 +8,15 @@ use solverforge::prelude::*;
 
 #[derive(Clone)]
 pub(crate) struct TaskInterval {
-    pub(super) index: usize,
+    pub(crate) index: usize,
     pub(crate) start: DateTime<Utc>,
     pub(crate) end: DateTime<Utc>,
     pub(super) load: usize,
     pub(super) depends_on: Vec<usize>,
     pub(super) timezone: Tz,
     pub(super) recovery_minutes: i64,
-    pub(super) excess_high_penalty: i64,
-    pub(super) high_streak_limit: i64,
+    pub(crate) excess_high_penalty: i64,
+    pub(crate) high_streak_limit: i64,
     /// Ends of applied high-load blocks, attached from the owning task.
     pub(super) applied_predecessor_ends: Vec<DateTime<Utc>>,
 }
@@ -42,18 +42,30 @@ impl TaskInterval {
     }
 
     /// Whether this task carries a high cognitive load (`load` key 2).
-    pub(super) fn is_high(&self) -> bool {
+    pub(crate) fn is_high(&self) -> bool {
         self.load == 2
+    }
+
+    /// Whether a high-load block ending at `predecessor_end` puts this task
+    /// under recovery pressure: the block ends at or before the task and
+    /// within the task's recovery gap. The single directional definition
+    /// shared by the scoring rules and proposal diagnostics.
+    pub(crate) fn gap_recovers(
+        &self,
+        predecessor_end: DateTime<Utc>,
+        predecessor_high: bool,
+    ) -> bool {
+        predecessor_high
+            && predecessor_end <= self.start
+            && (self.start - predecessor_end).num_minutes() < self.recovery_minutes
     }
 
     /// How many applied high-load blocks end within this task's recovery gap
     /// before it starts.
-    pub(super) fn applied_recovery_pressure(&self) -> usize {
+    pub(crate) fn applied_recovery_pressure(&self) -> usize {
         self.applied_predecessor_ends
             .iter()
-            .filter(|end| {
-                **end <= self.start && (self.start - **end).num_minutes() < self.recovery_minutes
-            })
+            .filter(|end| self.gap_recovers(**end, true))
             .count()
     }
 }

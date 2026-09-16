@@ -112,12 +112,14 @@ calendar and hands you a plan — which you approve before anything changes.
   planner will never double-book you.
 - **Availability windows always win.** Work only lands inside the hours you
   declared, in your timezone.
-- **Deadlines matter.** Hard deadlines are honored; soft deadlines are
-  weighted. Priorities decide who gets the scarce slots.
+- **Deadlines matter.** Hard deadlines are honored; soft-deadline lateness
+  outranks every deep-work preference. Priorities decide who gets the scarce
+  slots.
 - **Deep work is a preference, not a tyranny.** High-cognitive-load tasks are
-  steered toward your focus windows, with streak limits and recovery breaks so
-  you don't get four hours of back-to-back hard thinking. These preferences
-  bend; your availability and deadlines never do.
+  steered toward your focus windows and separated by recovery breaks. Back to
+  back high-load tasks cost you, and previously applied high-load blocks count
+  toward your configured streak limit before a task is charged. These
+  preferences bend; your availability and deadlines never do.
 
 ### You stay in control
 

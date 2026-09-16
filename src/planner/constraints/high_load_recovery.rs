@@ -22,7 +22,7 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
         .penalize(|left: &TimelineRow, right: &TimelineRow| {
             HardMediumSoftScore::of_soft(violation_penalty(left, right))
         })
-        .named("High cognitive-load recovery")
+        .named(super::names::INBOX_RECOVERY)
 }
 
 /// The penalty the later task of a violating pair owes, or zero when the pair
@@ -43,10 +43,7 @@ fn violation_penalty(left: &TimelineRow, right: &TimelineRow) -> i64 {
 }
 
 fn precedes(predecessor: &TaskInterval, target: &TaskInterval) -> bool {
-    predecessor.is_high()
-        && target.is_high()
-        && predecessor.end <= target.start
-        && (target.start - predecessor.end).num_minutes() < target.recovery_minutes
+    target.gap_recovers(predecessor.end, predecessor.is_high())
 }
 
 #[cfg(test)]

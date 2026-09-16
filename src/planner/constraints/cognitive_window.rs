@@ -27,7 +27,7 @@ pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScor
         .penalize(|left: &TimelineRow, right: &TimelineRow| {
             HardMediumSoftScore::of_soft(penalty(left, right))
         })
-        .named("Prefer cognitive windows")
+        .named(super::names::COGNITIVE_WINDOWS)
 }
 
 fn penalty(left: &TimelineRow, right: &TimelineRow) -> i64 {
@@ -57,8 +57,12 @@ fn penalty(left: &TimelineRow, right: &TimelineRow) -> i64 {
 }
 
 /// Counts task minutes whose local clock time falls outside the daily window,
-/// including across midnight.
-fn minutes_outside(task: &TaskInterval, window_start: NaiveTime, window_end: NaiveTime) -> i64 {
+/// including across midnight. Shared with proposal diagnostics.
+pub(crate) fn minutes_outside(
+    task: &TaskInterval,
+    window_start: NaiveTime,
+    window_end: NaiveTime,
+) -> i64 {
     let mut cursor = task.start.with_timezone(&task.timezone);
     let end = task.end.with_timezone(&task.timezone);
     let mut outside = 0;

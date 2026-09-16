@@ -8,8 +8,17 @@ use solverforge::prelude::*;
 
 pub use self::assemble::create_constraints;
 
+pub(crate) use self::cognitive_window::minutes_outside;
 pub(crate) use self::inside_availability::fully_covered;
 pub(crate) use self::support::TaskInterval;
+
+/// Constraint names shared by rule registration and score-analysis lookups so
+/// proposal diagnostics can never drift from the scored model.
+pub(crate) mod names {
+    pub const COGNITIVE_WINDOWS: &str = "Prefer cognitive windows";
+    pub const INBOX_RECOVERY: &str = "High cognitive-load recovery";
+    pub const APPLIED_RECOVERY: &str = "Applied high cognitive-load recovery";
+}
 
 mod assign_priority;
 mod support;
