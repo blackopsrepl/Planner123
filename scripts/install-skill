@@ -12,7 +12,7 @@ usage() {
 	cat <<'EOF'
 Usage: scripts/install-skill [--copy] [--only opencode|codex|repo]... [--uninstall] [--list] [--help]
 
-Install skills/solverforge-calendar into the skill directories agents scan.
+Install skills/planner123 into the skill directories agents scan.
 
   --copy            copy instead of symlink (default: symlink; ignored for repo)
   --only <target>   restrict to a target: opencode, codex, repo (repeatable)
@@ -27,7 +27,7 @@ Targets:
 EOF
 }
 
-skill_name=solverforge-calendar
+skill_name=planner123
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
 skill_src="$repo_root/skills/$skill_name"

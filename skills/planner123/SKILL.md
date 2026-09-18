@@ -1,9 +1,9 @@
 ---
-name: solverforge-calendar
-description: Query, drive, and maintain SolverForge Calendar (Rust ratatui calendar with SQLite, planner inbox, Google sync, and .ics import) through its non-interactive JSON CLI. Use when managing calendars, events, projects, dependencies, planner tasks/proposals, Google Calendar sync, or .ics data for solverforge-calendar, or when building, testing, linting, or releasing this repository. Use ONLY for solverforge-calendar; not for other calendar tools.
+name: planner123
+description: Query, drive, and maintain Planner123 (Rust ratatui calendar with SQLite, planner inbox, Google sync, and .ics import) through its non-interactive JSON CLI. Use when managing calendars, events, projects, dependencies, planner tasks/proposals, Google Calendar sync, or .ics data for planner123, or when building, testing, linting, or releasing this repository. Use ONLY for planner123; not for other calendar tools.
 ---
 
-# SolverForge Calendar — Agent Control Skill
+# Planner123 — Agent Control Skill
 
 Operate the whole product without the TUI. Everything routes through one
 non-interactive CLI that speaks JSON, so agents never need a terminal UI.
@@ -12,12 +12,12 @@ non-interactive CLI that speaks JSON, so agents never need a terminal UI.
 
 | Need | Command |
 | --- | --- |
-| Stable automation entry (works from any cwd inside the repo) | `./scripts/solverforge-calendar-cli <args>` |
-| Prebuilt binary | `./target/release/solverforge-calendar-cli <args>` |
+| Stable automation entry (works from any cwd inside the repo) | `./scripts/planner123-cli <args>` |
+| Prebuilt binary | `./target/release/planner123-cli <args>` |
 | TUI (humans only; never required for agents) | `cargo run` |
 
-`scripts/solverforge-calendar-cli` is a POSIX sh wrapper that resolves the repo
-root and runs `cargo run --bin solverforge-calendar-cli -- "$@"`. The examples
+`scripts/planner123-cli` is a POSIX sh wrapper that resolves the repo
+root and runs `cargo run --bin planner123-cli -- "$@"`. The examples
 below abbreviate it to `cli`.
 
 ## Response contract
@@ -32,8 +32,11 @@ below abbreviate it to `cli`.
 
 ## Data isolation (always do this for experiments)
 
-The SQLite database lives at `$XDG_DATA_HOME/solverforge/calendar.db`
-(default `~/.local/share/solverforge/calendar.db`). The binary has no `--db`
+The SQLite database lives at `$XDG_DATA_HOME/planner123/calendar.db`
+(default `~/.local/share/planner123/calendar.db`). On first open the binary
+copies a pre-rebrand `$XDG_DATA_HOME/solverforge/calendar.db` into the new
+location once (`VACUUM INTO` snapshot); after that the legacy file is ignored.
+The binary has no `--db`
 flag; isolate by overriding the env var, exactly like the repo's own tests:
 
 ```sh
@@ -159,7 +162,9 @@ cli google conflicts list
 cli google conflicts resolve <conflict-id> --strategy keep-local|keep-remote
 ```
 
-Behavior: refresh token in the OS keyring (service `solverforge-calendar`);
+Behavior: refresh token in the OS keyring (service `planner123`; a legacy
+`solverforge-calendar` entry is migrated into it on first read and removed on
+logout);
 read-only imported calendars reject local edits; two-way sync covers single
 events, all-day events, title, description, location, start/end, and master
 RRULE; detached recurrence exceptions, attendees editing, attachments, and
@@ -215,8 +220,8 @@ Rules that keep changes mergeable:
   never UI-local or CLI-local rules.
 - Tests stay deterministic: no live Google API, no real keyring. CLI tests
   isolate with `XDG_DATA_HOME` temp dirs; Google fakes use
-  `SOLVERFORGE_CALENDAR_TEST_GOOGLE_SYNC` / `..._GOOGLE_DISCOVERY` /
-  `SOLVERFORGE_CALENDAR_TEST_KEYRING_SERVICE`.
+  `PLANNER123_TEST_GOOGLE_SYNC` / `..._GOOGLE_DISCOVERY` /
+  `PLANNER123_TEST_KEYRING_SERVICE`.
 - Releases are cut with commit-and-tag-version from conventional commits; never
   hand-edit `CHANGELOG.md` or version files. See `AGENT.md` and `PRD.md`.
 
