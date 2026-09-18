@@ -4,8 +4,8 @@
 
 This repository contains a Linux-first Rust calendar with two supported entrypoints:
 
-- `solverforge-calendar`: ratatui TUI application
-- `solverforge-calendar-cli`: non-interactive JSON CLI for agents and automation
+- `planner123`: ratatui TUI application
+- `planner123-cli`: non-interactive JSON CLI for agents and automation
 
 ## Commands
 
@@ -28,7 +28,7 @@ Direct cargo commands used in CI:
 
 - `PRD.md`: current product requirements for the v0.4.x milestone
 - `src/main.rs`: TUI entrypoint
-- `src/bin/solverforge-calendar-cli.rs`: CLI entrypoint
+- `src/bin/planner123-cli.rs`: CLI entrypoint
 - `src/app.rs` and `src/app/`: stable TUI facade plus state, dispatch, navigation, forms, planner, integrations, and worker-result modules
 - `src/cli.rs` and `src/cli/`: stable typed CLI facade plus arguments, handlers, runtime, validation, and backend modules
 - `src/calendar_service.rs` and `src/calendar_service/`: shared calendar facade plus validation, mutation, and test modules
@@ -46,7 +46,7 @@ Direct cargo commands used in CI:
 
 - Keep the CLI fully non-interactive. No prompts, no confirmation flows, no choices.
 - Preserve `cargo run` as the TUI default path.
-- Keep agent automation explicit through `solverforge-calendar-cli` and `scripts/solverforge-calendar-cli`.
+- Keep agent automation explicit through `planner123-cli` and `scripts/planner123-cli`.
 - Route event mutation behavior through shared services, not UI-local rules.
 - Treat Google sync as explicit and deterministic. No hidden auto-sync startup behavior.
 - Tests must stay deterministic. Do not add live Google API or real keyring dependencies to automated tests.

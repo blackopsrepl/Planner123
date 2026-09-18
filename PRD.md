@@ -1,13 +1,13 @@
-# PRD: SolverForge Calendar v0.4.x
+# PRD: Planner123 v0.4.x
 
 Status: Draft
 Date: 2026-04-12
-Repo: `solverforge-calendar`
+Repo: `Planner123`
 Current release baseline: `v0.3.0` on `main`
 
 ## 1. Executive Summary
 
-SolverForge Calendar has reached a solid `v0.3.0` baseline for local calendar management, a JSON-first automation CLI, and inbound Google Calendar synchronization. The next release must turn that foundation into a product that is honest, elegant, compliant, and durable.
+Planner123 has reached a solid `v0.3.0` baseline for local calendar management, a JSON-first automation CLI, and inbound Google Calendar synchronization. The next release must turn that foundation into a product that is honest, elegant, compliant, and durable.
 
 This PRD defines the next shipping milestone:
 
@@ -696,7 +696,7 @@ Perform explicit manual checks for:
 - writable calendar import
 - read-only calendar import
 - create/update/delete in TUI on a Google calendar
-- conflict reproduction by editing the same event in Google UI and SolverForge
+- conflict reproduction by editing the same event in Google UI and Planner123
 - timezone behavior across local and Google events
 - `.ics` import from a representative sample file
 
@@ -834,7 +834,7 @@ The implementation must follow current official Google documentation, especially
   `https://developers.google.com/workspace/calendar/api/guides/errors`
 - Calendar API versioned resources and conditional modification guidance
   `https://developers.google.com/workspace/calendar/api/guides/version-resources`
-# SolverForge Planner Inbox
+# Planner123 Planner Inbox
 
 The calendar includes an explicit Planner Inbox for unscheduled, contiguous tasks. A batch solve creates a persistent review proposal and only explicit apply creates events. Existing event creation, quick-add, and explicit Google synchronization remain unchanged.
 

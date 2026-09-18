@@ -3,7 +3,7 @@
 ## Command shape
 
 ```text
-solverforge-calendar-cli <group> <action> [flags]
+planner123-cli <group> <action> [flags]
 ```
 
 Supported groups:

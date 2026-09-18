@@ -1,7 +1,7 @@
 # TUI Wireframe
 
 ```text
-┌──────────────── SolverForge Calendar ────────────────┬──────────── Sidebar ────────────┐
+┌──────────────── Planner123 ────────────────┬──────────── Sidebar ────────────┐
 │ Month / Week / Day / Agenda                          │ Calendars                        │
 │ Date range + Google health summary                   │  [x] Personal                    │
 ├──────────────────────────────────────────────────────┤  [x] Work G                      │

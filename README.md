@@ -1,19 +1,19 @@
-# SolverForge Calendar
+# Planner123
 
 <div align="center">
 
-  <img src="assets/mascot-20260403.png" alt="SolverForge Mascot" width="320" />
+  <img src="assets/mascot-20260403.png" alt="Planner123 Mascot" width="320" />
 
   <br />
 
-  [![CI](https://github.com/blackopsrepl/solverforge-calendar/actions/workflows/ci.yml/badge.svg?style=for-the-badge)](https://github.com/blackopsrepl/solverforge-calendar/actions/workflows/ci.yml)
-  [![Version](https://img.shields.io/badge/version-v0.5.0-00E6A8?style=for-the-badge)](https://github.com/blackopsrepl/solverforge-calendar)
+  [![CI](https://github.com/blackopsrepl/Planner123/actions/workflows/ci.yml/badge.svg?style=for-the-badge)](https://github.com/blackopsrepl/Planner123/actions/workflows/ci.yml)
+  [![Version](https://img.shields.io/badge/version-v0.5.0-00E6A8?style=for-the-badge)](https://github.com/blackopsrepl/Planner123)
   [![Rust](https://img.shields.io/badge/rust-stable-orange?style=for-the-badge)](https://www.rust-lang.org)
   [![Built With Ratatui](https://img.shields.io/badge/built%20with-ratatui-5A54FF?style=for-the-badge)](https://ratatui.rs/)
 
 </div>
 
-SolverForge Calendar is a keyboard-driven calendar that runs entirely on your
+Planner123 is a keyboard-driven calendar that runs entirely on your
 machine. Your events live in a local SQLite database — not in someone's cloud —
 while optional two-way Google Calendar sync and `.ics` import/export keep you
 connected to everyone else.
@@ -31,11 +31,11 @@ proposal and say yes.
 
 ```bash
 cargo build --release
-./target/release/solverforge-calendar
+./target/release/planner123
 ```
 
 That's it — the app creates its database on first launch at
-`~/.local/share/solverforge/calendar.db` and starts with a fresh calendar.
+`~/.local/share/planner123/calendar.db` and starts with a fresh calendar.
 Press `?` inside the app for the keybinding cheat sheet, or `p` to meet the
 planner.
 
@@ -138,7 +138,7 @@ the planner for you.
 
 ## Google Calendar sync
 
-SolverForge Calendar can work alongside your existing Google Calendars with
+Planner123 can work alongside your existing Google Calendars with
 conflict-aware two-way sync.
 
 Setup, once:
@@ -146,7 +146,7 @@ Setup, once:
 1. Create Google OAuth credentials of type `Desktop app` and enable the
    Google Calendar API for that project.
 2. In the TUI press `G` (or run `google auth login` in the CLI).
-3. Your system browser opens; SolverForge validates the OAuth round trip
+3. Your system browser opens; Planner123 validates the OAuth round trip
    (PKCE `S256`, random loopback port) and stores the refresh token in your OS
    keyring — never in a config file.
 4. Discover and import the calendars you want. Read-only Google calendars can
@@ -173,56 +173,56 @@ and RRULE recurrence come across; anything unsupported is reported as a
 warning instead of being silently dropped. Floating timestamps default to your
 local timezone unless the file specifies `TZID`.
 
-Press `x` to export everything currently visible to `~/solverforge-calendar.ics`.
+Press `x` to export everything currently visible to `~/planner123.ics`.
 
 ## Automating and scripting
 
-Every feature is exposed through `solverforge-calendar-cli`, a
+Every feature is exposed through `planner123-cli`, a
 non-interactive CLI that speaks JSON on stdout (success) and stderr (failure)
 with no prompts. It is the stable contract used by scripts, cron jobs, and AI
 agents.
 
 ```bash
 # Calendars
-cargo run --bin solverforge-calendar-cli -- calendars list
-cargo run --bin solverforge-calendar-cli -- calendars create --name Work --color '#50f872'
+cargo run --bin planner123-cli -- calendars list
+cargo run --bin planner123-cli -- calendars create --name Work --color '#50f872'
 
 # Events
-cargo run --bin solverforge-calendar-cli -- events create \
+cargo run --bin planner123-cli -- events create \
   --calendar-id <calendar-id> \
   --title 'Planning Session' \
   --start-at '2026-03-30 15:00:00' \
   --end-at '2026-03-30 16:00:00'
 
 # Google auth and discovery
-cargo run --bin solverforge-calendar-cli -- google auth status
-cargo run --bin solverforge-calendar-cli -- google auth login --client-id <desktop-client-id>
-cargo run --bin solverforge-calendar-cli -- google calendars discover
-cargo run --bin solverforge-calendar-cli -- google calendars import --google-id primary@example.com
+cargo run --bin planner123-cli -- google auth status
+cargo run --bin planner123-cli -- google auth login --client-id <desktop-client-id>
+cargo run --bin planner123-cli -- google calendars discover
+cargo run --bin planner123-cli -- google calendars import --google-id primary@example.com
 
 # Explicit sync status and conflict handling
-cargo run --bin solverforge-calendar-cli -- google sync
-cargo run --bin solverforge-calendar-cli -- google sync-status
-cargo run --bin solverforge-calendar-cli -- google conflicts list
-cargo run --bin solverforge-calendar-cli -- google conflicts resolve <conflict-id> --strategy keep-local
+cargo run --bin planner123-cli -- google sync
+cargo run --bin planner123-cli -- google sync-status
+cargo run --bin planner123-cli -- google conflicts list
+cargo run --bin planner123-cli -- google conflicts resolve <conflict-id> --strategy keep-local
 
 # iCal import
-cargo run --bin solverforge-calendar-cli -- ical import \
+cargo run --bin planner123-cli -- ical import \
   --calendar-id <calendar-id> \
   --path ./sample.ics
 
 # Planner: configure, add tasks, optimize, review, apply
-cargo run --bin solverforge-calendar-cli -- planner settings update \
+cargo run --bin planner123-cli -- planner settings update \
   --timezone Europe/Rome \
   --availability mon=09:00-17:00 \
   --cognitive-enabled true --high-window-start 08:00 --high-window-end 12:00 \
   --high-outside-penalty 1 --high-streak-limit 1 --recovery-minutes 30
-cargo run --bin solverforge-calendar-cli -- tasks create \
+cargo run --bin planner123-cli -- tasks create \
   --title 'Design review' --duration-minutes 60 --target-calendar-id <calendar-id> \
   --priority high --cognitive-load high
-cargo run --bin solverforge-calendar-cli -- planner optimize
-cargo run --bin solverforge-calendar-cli -- planner proposals list
-cargo run --bin solverforge-calendar-cli -- planner proposals apply <proposal-id>
+cargo run --bin planner123-cli -- planner optimize
+cargo run --bin planner123-cli -- planner proposals list
+cargo run --bin planner123-cli -- planner proposals apply <proposal-id>
 ```
 
 Command groups:
@@ -239,13 +239,13 @@ Command groups:
 - `planner settings`: `show`, `update`
 - `planner`: `optimize`, `proposals list`, `proposals get`, `proposals apply`
 
-A stable wrapper for automation lives at `./scripts/solverforge-calendar-cli`.
+A stable wrapper for automation lives at `./scripts/planner123-cli`.
 
 ### Agent skill
 
-A portable [Agent Skill](skills/solverforge-calendar/SKILL.md) teaches any
+A portable [Agent Skill](skills/planner123/SKILL.md) teaches any
 agent the full JSON contract, data isolation, planner workflow, and repo
-maintenance rules. The repo also ships `.agents/skills/solverforge-calendar`
+maintenance rules. The repo also ships `.agents/skills/planner123`
 pointing at it, so Codex picks the skill up automatically when working inside
 this repository. For user-scope installs (symlinks that stay in sync with this
 checkout):
