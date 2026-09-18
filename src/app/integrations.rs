@@ -187,11 +187,9 @@ impl App {
     // ── iCal export ───────────────────────────────────────────────
 
     pub(super) fn export_ical(&mut self) {
-        let path = dirs::home_dir()
-            .unwrap_or_default()
-            .join("solverforge-calendar.ics");
+        let path = dirs::home_dir().unwrap_or_default().join("planner123.ics");
 
-        match crate::ical::export_to_file(&self.events, "SolverForge Calendar", &path) {
+        match crate::ical::export_to_file(&self.events, "Planner123", &path) {
             Ok(()) => self.set_status(format!("Exported to {}", path.display()), false),
             Err(e) => self.set_status(format!("Export failed: {}", e), true),
         }

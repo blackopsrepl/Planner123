@@ -4,7 +4,8 @@ use keyring::Entry;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const KEYRING_SERVICE: &str = "solverforge-calendar";
+const KEYRING_SERVICE: &str = "planner123";
+const LEGACY_KEYRING_SERVICE: &str = "solverforge-calendar";
 const KEYRING_CLIENT_ID_KEY: &str = "google_client_id";
 const KEYRING_CLIENT_SECRET_KEY: &str = "google_client_secret";
 const KEYRING_REFRESH_TOKEN_KEY: &str = "google_refresh_token";

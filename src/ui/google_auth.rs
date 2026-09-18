@@ -39,7 +39,7 @@ pub fn render_google_auth(app: &App, frame: &mut Frame) {
             t.normal(),
         )]),
         Line::from(vec![Span::styled(
-            "  SolverForge opens the system browser and stores the refresh token in the OS keyring.",
+            "  Planner123 opens the system browser and stores the refresh token in the OS keyring.",
             t.normal(),
         )]),
         Line::from(""),

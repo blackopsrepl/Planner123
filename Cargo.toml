@@ -1,10 +1,10 @@
 [package]
-name = "solverforge-calendar"
+name = "planner123"
 version = "0.5.0"
 edition = "2021"
 rust-version = "1.95"
-description = "A spiffy ratatui TUI calendar — local SQLite + Google Calendar, DAG-linked events"
-default-run = "solverforge-calendar"
+description = "Planner123 — a spiffy ratatui TUI calendar — local SQLite + Google Calendar, DAG-linked events"
+default-run = "planner123"
 
 [dependencies]
 # TUI

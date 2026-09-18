@@ -14,14 +14,12 @@ pub(super) fn solve(plan: SolverPlan) -> Result<SolverPlan, PlannerError> {
             }
             SolverEvent::Failed { error, .. } => {
                 let _ = PLANNER_MANAGER.delete(job);
-                return Err(PlannerError::Internal(format!(
-                    "SolverForge failed: {error}"
-                )));
+                return Err(PlannerError::Internal(format!("Planner failed: {error}")));
             }
             SolverEvent::Cancelled { .. } => {
                 let _ = PLANNER_MANAGER.delete(job);
                 return Err(PlannerError::Conflict(
-                    "SolverForge optimization was cancelled".into(),
+                    "Planner optimization was cancelled".into(),
                 ));
             }
             _ => {}
@@ -29,7 +27,7 @@ pub(super) fn solve(plan: SolverPlan) -> Result<SolverPlan, PlannerError> {
     }
     let _ = PLANNER_MANAGER.delete(job);
     Err(PlannerError::Internal(
-        "SolverForge ended without a terminal result".into(),
+        "Planner ended without a terminal result".into(),
     ))
 }
 

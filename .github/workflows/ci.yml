@@ -50,4 +50,4 @@ jobs:
         run: cargo test
 
       - name: Smoke test CLI entrypoint
-        run: cargo run --bin solverforge-calendar-cli -- calendars list
+        run: cargo run --bin planner123-cli -- calendars list

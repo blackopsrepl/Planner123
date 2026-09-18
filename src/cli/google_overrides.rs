@@ -19,7 +19,7 @@ type MaybeGoogleSyncOverride = Option<Result<GoogleSyncCounts, CliError>>;
 fn google_sync_override_result(
     calendar: &models::Calendar,
 ) -> Result<MaybeGoogleSyncOverride, CliError> {
-    let Ok(raw) = std::env::var("SOLVERFORGE_CALENDAR_TEST_GOOGLE_SYNC") else {
+    let Ok(raw) = std::env::var("PLANNER123_TEST_GOOGLE_SYNC") else {
         return Ok(None);
     };
 
@@ -55,7 +55,7 @@ struct GoogleDiscoveryOverrideItem {
 
 fn google_discovery_override(
 ) -> Result<Option<Vec<google::discovery::DiscoveredGoogleCalendar>>, CliError> {
-    let Ok(raw) = std::env::var("SOLVERFORGE_CALENDAR_TEST_GOOGLE_DISCOVERY") else {
+    let Ok(raw) = std::env::var("PLANNER123_TEST_GOOGLE_DISCOVERY") else {
         return Ok(None);
     };
 

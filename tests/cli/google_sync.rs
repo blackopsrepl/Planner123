@@ -35,7 +35,7 @@ fn google_sync_runs_through_binary_with_test_override() {
     );
 
     let output = cli_command(&temp)
-        .env("SOLVERFORGE_CALENDAR_TEST_GOOGLE_SYNC", override_json)
+        .env("PLANNER123_TEST_GOOGLE_SYNC", override_json)
         .args(["google", "sync", "--calendar-id", &calendar_id])
         .output()
         .unwrap();
@@ -52,10 +52,7 @@ fn google_sync_runs_through_binary_with_test_override() {
 fn google_auth_status_reports_disconnected_with_isolated_keyring() {
     let temp = TempDir::new().unwrap();
     let output = cli_command(&temp)
-        .env(
-            "SOLVERFORGE_CALENDAR_TEST_KEYRING_SERVICE",
-            unique_keyring_service(),
-        )
+        .env("PLANNER123_TEST_KEYRING_SERVICE", unique_keyring_service())
         .args(["google", "auth", "status"])
         .output()
         .unwrap();
@@ -90,7 +87,7 @@ fn google_calendar_discovery_and_import_use_test_override() {
     ]"##;
 
     let discovered = cli_command(&temp)
-        .env("SOLVERFORGE_CALENDAR_TEST_GOOGLE_DISCOVERY", discovery)
+        .env("PLANNER123_TEST_GOOGLE_DISCOVERY", discovery)
         .args(["google", "calendars", "discover"])
         .output()
         .unwrap();
@@ -101,7 +98,7 @@ fn google_calendar_discovery_and_import_use_test_override() {
     assert!(!discovered_json["data"][1]["imported"].as_bool().unwrap());
 
     let imported = cli_command(&temp)
-        .env("SOLVERFORGE_CALENDAR_TEST_GOOGLE_DISCOVERY", discovery)
+        .env("PLANNER123_TEST_GOOGLE_DISCOVERY", discovery)
         .args([
             "google",
             "calendars",

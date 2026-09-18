@@ -1,4 +1,4 @@
-/* SolverForge Calendar — spiffy TUI calendar with local SQLite + Google Calendar.  Entry point: sets up the terminal, builds the tokio runtime, starts the event loop.  */
+/* Planner123 — spiffy TUI calendar with local SQLite + Google Calendar.  Entry point: sets up the terminal, builds the tokio runtime, starts the event loop.  */
 
 use std::io;
 use std::time::Duration;
@@ -11,9 +11,9 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use solverforge_calendar::app::App;
-use solverforge_calendar::event::{Event, EventHandler};
-use solverforge_calendar::{notifications, ui};
+use planner123::app::App;
+use planner123::event::{Event, EventHandler};
+use planner123::{notifications, ui};
 
 fn main() -> Result<()> {
     // Install panic hook that restores the terminal before printing the panic.

@@ -18,10 +18,29 @@ fn load_saved_credentials() -> Option<GoogleSavedCredentials> {
 }
 
 fn read_keyring(key: &str) -> Option<String> {
-    Entry::new(&keyring_service(), key)
+    let value = Entry::new(&keyring_service(), key)
         .ok()?
         .get_password()
-        .ok()
+        .ok();
+    match value {
+        Some(secret) => Some(secret),
+        None => migrate_legacy_keyring(key),
+    }
+}
+
+/* One-time move of a pre-rebrand keyring secret into the new service.
+
+Only the real default service migrates; test overrides never touch legacy
+entries. Logout deletes both so a migrated token cannot resurrect. */
+fn migrate_legacy_keyring(key: &str) -> Option<String> {
+    if keyring_service() != KEYRING_SERVICE {
+        return None;
+    }
+    let legacy = Entry::new(LEGACY_KEYRING_SERVICE, key).ok()?;
+    let value = legacy.get_password().ok()?;
+    let entry = Entry::new(KEYRING_SERVICE, key).ok()?;
+    entry.set_password(&value).ok()?;
+    Some(value)
 }
 
 fn write_keyring(key: &str, value: &str) -> Result<()> {
@@ -35,12 +54,16 @@ fn delete_keyring(key: &str) -> Result<()> {
     if let Ok(entry) = Entry::new(&keyring_service(), key) {
         let _ = entry.delete_credential();
     }
+    if keyring_service() == KEYRING_SERVICE {
+        if let Ok(legacy) = Entry::new(LEGACY_KEYRING_SERVICE, key) {
+            let _ = legacy.delete_credential();
+        }
+    }
     Ok(())
 }
 
 fn keyring_service() -> String {
-    std::env::var("SOLVERFORGE_CALENDAR_TEST_KEYRING_SERVICE")
-        .unwrap_or_else(|_| KEYRING_SERVICE.to_string())
+    std::env::var("PLANNER123_TEST_KEYRING_SERVICE").unwrap_or_else(|_| KEYRING_SERVICE.to_string())
 }
 
 fn urlencode(s: &str) -> String {

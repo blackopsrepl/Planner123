@@ -24,7 +24,7 @@ pub fn notify_event(event: &Event, minutes_before: i64) -> Result<()> {
         .summary(&event.title)
         .body(&body)
         .icon("calendar")
-        .appname("SolverForge Calendar")
+        .appname("Planner123")
         .timeout(notify_rust::Timeout::Milliseconds(8000))
         .show()
         .map_err(|e| anyhow::anyhow!("notification failed: {}", e))?;

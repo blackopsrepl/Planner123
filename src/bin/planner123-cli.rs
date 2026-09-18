@@ -1,7 +1,7 @@
 use clap::{error::ErrorKind, Parser};
 
 fn main() {
-    let cli = match solverforge_calendar::cli::Cli::try_parse() {
+    let cli = match planner123::cli::Cli::try_parse() {
         Ok(cli) => cli,
         Err(err) => match err.kind() {
             ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => {
@@ -11,8 +11,8 @@ fn main() {
             _ => {
                 eprintln!(
                     "{}",
-                    serde_json::to_string_pretty(&solverforge_calendar::cli::error_value(
-                        &solverforge_calendar::cli::CliError::invalid_arguments(err.to_string()),
+                    serde_json::to_string_pretty(&planner123::cli::error_value(
+                        &planner123::cli::CliError::invalid_arguments(err.to_string()),
                     ))
                     .expect("serializable clap error")
                 );
@@ -21,7 +21,7 @@ fn main() {
         },
     };
 
-    match solverforge_calendar::cli::execute(cli) {
+    match planner123::cli::execute(cli) {
         Ok(value) => {
             println!(
                 "{}",
@@ -31,7 +31,7 @@ fn main() {
         Err(err) => {
             eprintln!(
                 "{}",
-                serde_json::to_string_pretty(&solverforge_calendar::cli::error_value(&err))
+                serde_json::to_string_pretty(&planner123::cli::error_value(&err))
                     .expect("serializable error payload")
             );
             std::process::exit(1);

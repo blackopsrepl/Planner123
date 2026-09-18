@@ -77,7 +77,7 @@ fn invalid_enum_returns_json_error() {
 
 #[test]
 fn agent_wrapper_script_exists() {
-    assert!(Path::new("scripts/solverforge-calendar-cli").exists());
+    assert!(Path::new("scripts/planner123-cli").exists());
 }
 
 #[test]

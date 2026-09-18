@@ -1,7 +1,7 @@
 pub fn export_events(events: &[Event], calendar_name: &str) -> String {
     let mut cal = ICalCalendar::new();
     cal.name(calendar_name);
-    cal.description("Exported from SolverForge Calendar");
+    cal.description("Exported from Planner123");
 
     for ev in events {
         let mut ical_event = ICalEvent::new();

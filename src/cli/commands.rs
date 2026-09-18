@@ -1,5 +1,5 @@
 #[derive(Debug, Parser)]
-#[command(name = "solverforge-calendar-cli", about = "JSON-first automation CLI")]
+#[command(name = "planner123-cli", about = "JSON-first automation CLI")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,

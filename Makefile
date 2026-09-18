@@ -1,4 +1,4 @@
-# SolverForge Calendar Makefile
+# Planner123 Makefile
 
 GREEN := \033[92m
 CYAN := \033[96m
@@ -18,7 +18,7 @@ CARGO_HOME ?= $(HOME)/.cargo
 .DEFAULT_GOAL := help
 
 help:
-	@printf "$(CYAN)$(BOLD)SolverForge Calendar$(RESET) v$(VERSION)\n\n"
+	@printf "$(CYAN)$(BOLD)Planner123$(RESET) v$(VERSION)\n\n"
 	@printf "$(ARROW) build          Build the TUI and CLI binaries\n"
 	@printf "$(ARROW) build-release  Build optimized binaries\n"
 	@printf "$(ARROW) install        Install both binaries into $(CARGO_HOME)/bin\n"
@@ -44,18 +44,18 @@ build-release:
 	@cargo build --release --bins && printf "$(GREEN)$(CHECK) Release build passed$(RESET)\n" || (printf "$(RED)$(CROSS) Release build failed$(RESET)\n" && exit 1)
 
 install:
-	@printf "$(ARROW) Installing solverforge-calendar and solverforge-calendar-cli into $(CARGO_HOME)/bin...\n"
+	@printf "$(ARROW) Installing planner123 and planner123-cli into $(CARGO_HOME)/bin...\n"
 	@cargo install --path . --locked --bins --force && printf "$(GREEN)$(CHECK) Install passed$(RESET)\n" || (printf "$(RED)$(CROSS) Install failed$(RESET)\n" && exit 1)
 
 uninstall:
 	@printf "$(ARROW) Removing installed binaries from $(CARGO_HOME)/bin...\n"
-	@cargo uninstall solverforge-calendar && printf "$(GREEN)$(CHECK) Uninstall passed$(RESET)\n" || (printf "$(RED)$(CROSS) Uninstall failed$(RESET)\n" && exit 1)
+	@cargo uninstall planner123 && printf "$(GREEN)$(CHECK) Uninstall passed$(RESET)\n" || (printf "$(RED)$(CROSS) Uninstall failed$(RESET)\n" && exit 1)
 
 run:
 	@cargo run
 
 run-cli:
-	@cargo run --bin solverforge-calendar-cli -- $(ARGS)
+	@cargo run --bin planner123-cli -- $(ARGS)
 
 test:
 	@printf "$(ARROW) Running tests...\n"

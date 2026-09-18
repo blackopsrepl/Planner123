@@ -128,7 +128,7 @@ pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
         Paragraph::new(proposal).block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" SolverForge Proposal "),
+                .title(" Planner123 Proposal "),
         ),
         proposal_area,
     );

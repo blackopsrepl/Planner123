@@ -150,12 +150,12 @@ pub async fn run_oauth_flow(client_id: &str, client_secret: Option<&str>) -> Res
         let response = if callback.error.is_some() {
             "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n\
              <html><body style='background:#0B0C16;color:#ff7a90;font-family:monospace'>\
-             <h2>SolverForge Calendar</h2><p>Authorization failed. Return to the app and try again.</p>\
+             <h2>Planner123</h2><p>Authorization failed. Return to the app and try again.</p>\
              </body></html>"
         } else {
             "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
              <html><body style='background:#0B0C16;color:#82FB9C;font-family:monospace'>\
-             <h2>SolverForge Calendar</h2><p>Authorization complete. You can close this tab.</p>\
+             <h2>Planner123</h2><p>Authorization complete. You can close this tab.</p>\
              </body></html>"
         };
         let _ = stream.write_all(response.as_bytes());

@@ -1,17 +1,17 @@
 use assert_cmd::Command;
-use serde_json::Value;
-use solverforge_calendar::{
+use planner123::{
     db, event_service,
     google::types::{GoogleEvent, GoogleEventTime},
     models::Event,
     sync::state::{self, ConflictResolutionStatus, EventSyncState, SyncConflict, SyncState},
 };
+use serde_json::Value;
 use std::path::Path;
 use tempfile::TempDir;
 use uuid::Uuid;
 
 fn cli_command(temp: &TempDir) -> Command {
-    let mut cmd = Command::cargo_bin("solverforge-calendar-cli").unwrap();
+    let mut cmd = Command::cargo_bin("planner123-cli").unwrap();
     cmd.env("XDG_DATA_HOME", temp.path());
     cmd
 }
@@ -55,11 +55,11 @@ fn create_google_calendar(temp: &TempDir, name: &str) -> String {
 }
 
 fn unique_keyring_service() -> String {
-    format!("solverforge-calendar-test-{}", Uuid::new_v4().simple())
+    format!("planner123-test-{}", Uuid::new_v4().simple())
 }
 
 fn db_path_for(temp: &TempDir) -> std::path::PathBuf {
-    temp.path().join("solverforge").join("calendar.db")
+    temp.path().join("planner123").join("calendar.db")
 }
 
 include!("cli/planner_and_errors.rs");

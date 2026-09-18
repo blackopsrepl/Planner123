@@ -2068,6 +2068,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
+name = "planner123"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "assert_cmd",
+ "base64",
+ "chrono",
+ "chrono-tz",
+ "clap",
+ "crossterm",
+ "dirs",
+ "google-calendar3",
+ "iana-time-zone",
+ "icalendar",
+ "keyring",
+ "notify-rust",
+ "open",
+ "pretty_assertions",
+ "ratatui",
+ "reqwest",
+ "rrule",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "solverforge",
+ "tempfile",
+ "tokio",
+ "toml 0.8.23",
+ "unicode-width 0.2.0",
+ "uuid",
+]
+
+[[package]]
 name = "polling"
 version = "3.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2871,40 +2905,6 @@ dependencies = [
  "solverforge-core",
  "solverforge-scoring",
  "solverforge-solver",
-]
-
-[[package]]
-name = "solverforge-calendar"
-version = "0.5.0"
-dependencies = [
- "anyhow",
- "assert_cmd",
- "base64",
- "chrono",
- "chrono-tz",
- "clap",
- "crossterm",
- "dirs",
- "google-calendar3",
- "iana-time-zone",
- "icalendar",
- "keyring",
- "notify-rust",
- "open",
- "pretty_assertions",
- "ratatui",
- "reqwest",
- "rrule",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "solverforge",
- "tempfile",
- "tokio",
- "toml 0.8.23",
- "unicode-width 0.2.0",
- "uuid",
 ]
 
 [[package]]

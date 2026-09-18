@@ -41,7 +41,7 @@ pub fn render_header(app: &App, frame: &mut Frame, area: Rect) {
         View::Agenda => "Agenda".to_string(),
         View::EventForm => "New Event".to_string(),
         View::IcalImport => "Import .ics".to_string(),
-        _ => "SolverForge Calendar".to_string(),
+        _ => "Planner123".to_string(),
     };
 
     // Google sync indicator
@@ -52,7 +52,7 @@ pub fn render_header(app: &App, frame: &mut Frame, area: Rect) {
     }; // nf-fa-google (approx)
 
     let title = format!(
-        "  \u{f073}  SolverForge Calendar{}     {}  ",
+        "  \u{f073}  Planner123{}     {}  ",
         google_badge, view_label,
     );
 
