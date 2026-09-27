@@ -65,6 +65,13 @@ pub struct App {
     pub view_year: i32,
     pub week_scroll: i16,            // hour offset in week/day view (0 = 00:00)
     pub selected_event_index: usize, // index into visible_events
+    /// Inclusive date range covered by the last `load_events` request (loaded or
+    /// in flight). `None` until the first load is issued; navigation reloads
+    /// whenever the current view needs a range outside it.
+    pub event_window: Option<(NaiveDate, NaiveDate)>,
+    /// Sequence id of the most recent `load_events` request. Results carrying an
+    /// older id are discarded so a slow response cannot overwrite a newer one.
+    pub event_load_seq: u64,
 
     // ── Data ─────────────────────────────────────────────────────
     pub calendars: Vec<Calendar>,
@@ -165,6 +172,8 @@ impl App {
             view_year: today.year(),
             week_scroll: 8, // default to showing 08:00
             selected_event_index: 0,
+            event_window: None,
+            event_load_seq: 0,
             calendars: Vec::new(),
             calendar_sync_state: HashMap::new(),
             projects: Vec::new(),

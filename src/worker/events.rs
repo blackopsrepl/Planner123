@@ -1,24 +1,19 @@
 use super::*;
 impl Worker {
-    pub fn load_events(&self, year: i32, month: u32) {
+    /* Load events overlapping the inclusive date window `[start, end]`.
+
+    The caller owns window selection so navigation can compare the window it
+    just loaded against the window the current view needs. Returns the request's
+    sequence id so the app can discard superseded responses. */
+    pub fn load_events(&self, start: chrono::NaiveDate, end: chrono::NaiveDate) -> u64 {
         let tx = self.tx.clone();
+        let seq = self
+            .load_seq
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            + 1;
         self.rt.spawn_blocking(move || {
             let result = (|| -> Result<_> {
                 let conn = crate::db::open()?;
-                // Window: month - 7 days to month + 37 days (covers 5-week grid + next month)
-                let start = chrono::NaiveDate::from_ymd_opt(year, month, 1)
-                    .unwrap_or_default()
-                    .pred_opt()
-                    .unwrap_or_default()
-                    .pred_opt()
-                    .unwrap_or_default();
-                let end = chrono::NaiveDate::from_ymd_opt(
-                    if month == 12 { year + 1 } else { year },
-                    if month == 12 { 1 } else { month + 1 },
-                    1,
-                )
-                .unwrap_or_default();
-
                 let from_str = format!("{} 00:00:00", start);
                 let to_str = format!("{} 23:59:59", end);
                 let events = crate::db::load_events_in_range(&conn, &from_str, &to_str)?;
@@ -26,13 +21,19 @@ impl Worker {
             })();
             match result {
                 Ok(events) => {
-                    let _ = tx.send(WorkerResult::EventsLoaded { events });
+                    let _ = tx.send(WorkerResult::EventsLoaded {
+                        seq,
+                        start,
+                        end,
+                        events,
+                    });
                 }
                 Err(e) => {
                     let _ = tx.send(WorkerResult::Error(e.to_string()));
                 }
             }
         });
+        seq
     }
 
     pub fn save_event(&self, event: Event, is_new: bool) {

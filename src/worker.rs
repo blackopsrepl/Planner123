@@ -11,6 +11,9 @@ pub enum WorkerResult {
     CalendarSyncStatesLoaded(Vec<crate::sync::state::CalendarSyncState>),
     ProjectsLoaded(Vec<Project>),
     EventsLoaded {
+        seq: u64,
+        start: chrono::NaiveDate,
+        end: chrono::NaiveDate,
         events: Vec<Event>,
     },
     DependenciesLoaded(Vec<EventDependency>),
@@ -38,12 +41,20 @@ pub struct Worker {
     tx: mpsc::Sender<WorkerResult>,
     pub rx: mpsc::Receiver<WorkerResult>,
     rt: tokio::runtime::Handle,
+    /* Monotonic id assigned to each event load so the app can discard results
+    that arrive after a newer window was requested. */
+    load_seq: std::sync::atomic::AtomicU64,
 }
 
 impl Worker {
     pub fn new(rt: tokio::runtime::Handle) -> Self {
         let (tx, rx) = mpsc::channel();
-        Self { tx, rx, rt }
+        Self {
+            tx,
+            rx,
+            rt,
+            load_seq: std::sync::atomic::AtomicU64::new(0),
+        }
     }
 
     /// Drain all pending results without blocking.

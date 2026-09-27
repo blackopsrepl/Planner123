@@ -14,7 +14,7 @@ impl App {
             WorkerResult::CalendarsLoaded(cals) => {
                 self.calendars = cals;
                 // Now load events for the current view window
-                self.worker.load_events(self.view_year, self.view_month);
+                self.reload_events();
                 self.loading = false; // spinner shows until EventsLoaded arrives
             }
             WorkerResult::CalendarSyncStatesLoaded(states) => {
@@ -26,7 +26,17 @@ impl App {
             WorkerResult::ProjectsLoaded(projs) => {
                 self.projects = projs;
             }
-            WorkerResult::EventsLoaded { events } => {
+            WorkerResult::EventsLoaded {
+                seq,
+                start,
+                end,
+                events,
+            } => {
+                // Ignore a response that a newer load request has superseded.
+                if seq < self.event_load_seq {
+                    return;
+                }
+                self.event_window = Some((start, end));
                 self.events = events.clone();
                 // Update shared arc for notification task
                 let arc = self.events_arc.clone();
@@ -74,19 +84,19 @@ impl App {
             WorkerResult::PlannerProposalApplied(proposal) => {
                 self.planner_proposal = Some(proposal);
                 self.worker.load_planner_tasks();
-                self.worker.load_events(self.view_year, self.view_month);
+                self.reload_events();
                 self.loading = false;
                 self.set_status("Scheduled planner tasks were applied.", false);
-            }
-            WorkerResult::EventSaved(ev) => {
-                // Refresh events for the current window
-                self.worker.load_events(self.view_year, self.view_month);
-                self.set_status(format!("Saved: {}", ev.title), false);
-                self.view = View::Month;
             }
             WorkerResult::EventDeleted(id) => {
                 self.events.retain(|e| e.id != id);
                 self.set_status("Event deleted.", false);
+            }
+            WorkerResult::EventSaved(ev) => {
+                // Refresh events for the window the user returns to
+                self.view = View::Month;
+                self.reload_events();
+                self.set_status(format!("Saved: {}", ev.title), false);
             }
             WorkerResult::GoogleAuthComplete(client) => {
                 self.google_client = Some(client);
@@ -113,7 +123,7 @@ impl App {
                 events_updated,
                 conflicts_detected,
             } => {
-                self.worker.load_events(self.view_year, self.view_month);
+                self.reload_events();
                 self.worker.load_calendar_sync_states();
                 let (status, is_error) = google_sync_finished_status(
                     calendars_succeeded,
@@ -126,7 +136,7 @@ impl App {
                 self.loading = false;
             }
             WorkerResult::IcalImported(report) => {
-                self.worker.load_events(self.view_year, self.view_month);
+                self.reload_events();
                 self.worker.load_calendar_sync_states();
                 self.view = View::Month;
                 let warning_suffix = if report.warnings.is_empty() {
