@@ -222,8 +222,12 @@ Rules that keep changes mergeable:
   isolate with `XDG_DATA_HOME` temp dirs; Google fakes use
   `PLANNER123_TEST_GOOGLE_SYNC` / `..._GOOGLE_DISCOVERY` /
   `PLANNER123_TEST_KEYRING_SERVICE`.
-- Releases are cut with commit-and-tag-version from conventional commits; never
-  hand-edit `CHANGELOG.md` or version files. See `AGENT.md` and `PRD.md`.
+- Releases are cut with `npx commit-and-tag-version` from conventional commits;
+  never hand-edit `CHANGELOG.md` or version files. `.versionrc.js` declares every
+  surface the tool bumps (`Cargo.toml`, `Cargo.lock`, the `README.md` badge) and
+  the tag/message/URL formats — the tool owns all of them, so a missing or
+  incomplete surface silently survives a release. Order: `make pre-release`,
+  then the tool, then push the branch and the tag to every remote.
 
 ## Troubleshooting
 
