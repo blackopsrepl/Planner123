@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use chrono::{Datelike, Local, NaiveDate};
 use planner123::app::App;
-use planner123::keys::Action;
+use planner123::keys::{Action, View};
 use planner123::models::Event;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
@@ -219,5 +219,57 @@ fn navigation_requests_window_covering_the_focused_month() {
     assert!(
         start <= target && target <= end,
         "requested window {start}..{end} must include {target}"
+    );
+}
+
+#[test]
+fn escaping_an_overlay_after_day_navigation_shows_the_focused_month() {
+    let _serial = serial_guard();
+    let dir = TempDir::new().unwrap();
+    let target = offset_month_date(2);
+    // Second event in the same month, on a day the app never loads while the
+    // cursor walks out to `target` one day at a time.
+    let (target_year, target_month) = offset_month(2);
+    let other_day = date(target_year, target_month, 20);
+    let (rt, mut app) = seeded_app(
+        &dir,
+        &[
+            (
+                &format!("{} 09:00:00", target),
+                &format!("{} 10:00:00", target),
+            ),
+            (
+                &format!("{} 09:00:00", other_day),
+                &format!("{} 10:00:00", other_day),
+            ),
+        ],
+    );
+
+    // Day view: step one day at a time so every load narrows the window to a
+    // single date, and the display month stops following the cursor.
+    app.dispatch(Action::ViewDay);
+    while app.focused_date != target {
+        app.dispatch(Action::NextPeriod);
+    }
+    assert!(
+        pump_until(&mut app, &rt, Duration::from_secs(5), |app| app
+            .event_window
+            == Some((target, target))
+            && !app.loading),
+        "day navigation must settle on a single-day window"
+    );
+
+    // Open an overlay and back out of it: returning to the month view must
+    // re-anchor the grid to the focused date and load that month.
+    app.dispatch(Action::Help);
+    app.dispatch(Action::Escape);
+
+    assert_eq!(app.view, View::Month);
+    assert!(
+        pump_until(&mut app, &rt, Duration::from_secs(5), |app| app.view_month
+            == target_month
+            && app.view_year == target_year
+            && !app.events_on_date(other_day).is_empty()),
+        "escaping to the month view must re-anchor to the focused month and load it"
     );
 }
