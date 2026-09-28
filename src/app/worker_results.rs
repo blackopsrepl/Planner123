@@ -136,9 +136,13 @@ impl App {
                 self.loading = false;
             }
             WorkerResult::IcalImported(report) => {
+                // Enter the month grid before the refresh below: the requested
+                // window is derived from the current view, so reloading first
+                // would fetch the range of the view being left behind and skip
+                // re-anchoring the display month.
+                self.view = View::Month;
                 self.reload_events();
                 self.worker.load_calendar_sync_states();
-                self.view = View::Month;
                 let warning_suffix = if report.warnings.is_empty() {
                     String::new()
                 } else {

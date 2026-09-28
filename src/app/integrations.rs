@@ -138,7 +138,7 @@ impl App {
             Ok(_) => {
                 self.google_client = None;
                 self.google_discovered_calendars.clear();
-                self.view = View::Month;
+                self.switch_view(View::Month);
                 self.set_status("Google disconnected.", false);
             }
             Err(err) => self.set_status(format!("Google logout failed: {}", err), true),

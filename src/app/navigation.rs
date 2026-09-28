@@ -193,14 +193,16 @@ impl App {
             | View::QuickAdd
             | View::GoogleAuth
             | View::GoogleManage => {
-                self.view = View::Month;
+                // Closing an overlay returns to the month grid. It has to go
+                // through `switch_view`: the overlay may have been opened from a
+                // view whose window is narrower than a month (day/week), in
+                // which case the grid must re-anchor to the focused date and
+                // load that month instead of rendering the stale display month.
+                self.switch_view(View::Month);
             }
             View::PlannerTaskForm | View::PlannerSettingsForm => self.view = View::PlannerInbox,
-            View::PlannerInbox => self.view = View::Month,
-            View::CalendarList => {
-                self.sidebar_focused = false;
-                self.view = View::Month;
-            }
+            View::PlannerInbox => self.switch_view(View::Month),
+            View::CalendarList => self.switch_view(View::Month),
             _ => {}
         }
     }
