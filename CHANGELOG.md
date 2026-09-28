@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.0](https://github.com/blackopsrepl/Planner123/compare/v0.5.0...v0.6.0) (2026-09-28)
+
+### ⚠ BREAKING CHANGES
+
+* rename application to Planner123
+
+### Features
+
+* rename application to Planner123 7b86806
+* **skill:** rename agent skill to planner123 07d0e52
+
+### Bug Fixes
+
+* **app:** reload events from the loaded window, not the display month 51367db, closes #2
+* **app:** route returns to the month view through the reload path 809808a
 
 ## [0.5.0](https://github.com/blackopsrepl/Planner123/compare/v0.4.0...v0.5.0) (2026-09-16)
 
