@@ -196,12 +196,6 @@ impl App {
 
     // ── Selected event helpers ─────────────────────────────────────
 
-    pub(super) fn delete_selected_event(&mut self) {
-        if let Some(event) = self.selected_event().cloned() {
-            self.worker.delete_event(event.id);
-        }
-    }
-
     pub(super) fn select_event(&mut self) {
         // In month view, Select means switch to day view for the focused date
         if self.view == View::Month {

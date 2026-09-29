@@ -93,8 +93,9 @@ impl App {
                 self.set_status("Event deleted.", false);
             }
             WorkerResult::EventSaved(ev) => {
-                // Refresh events for the window the user returns to
-                self.view = View::Month;
+                // Refresh events for the view the form was opened from.
+                self.view = self.return_view.clone();
+                self.sidebar_focused = false;
                 self.reload_events();
                 self.set_status(format!("Saved: {}", ev.title), false);
             }

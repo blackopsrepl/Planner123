@@ -1,6 +1,19 @@
 use super::*;
 impl App {
     pub fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
+        /* An armed confirmation owns this keystroke: `y` commits, anything else
+        cancels. Nothing is resolved, so no other key can be the one that
+        deletes an event. */
+        if let Some(confirm) = self.pending_confirm.take() {
+            if key.code == crossterm::event::KeyCode::Char('y') {
+                self.run_confirm(confirm);
+            } else {
+                self.pending_confirm = Some(confirm);
+                self.cancel_confirm();
+            }
+            return;
+        }
+
         let action = crate::keys::resolve(&self.view, key);
         self.handle_key_action(action);
     }
@@ -59,7 +72,7 @@ impl App {
             // Event actions
             Action::CreateEvent => self.open_event_form(None),
             Action::EditEvent => self.open_edit_form(),
-            Action::DeleteEvent => self.delete_selected_event(),
+            Action::DeleteEvent => self.request_delete(),
             Action::SelectEvent => self.select_event(),
 
             // Form
@@ -171,7 +184,7 @@ impl App {
 
             // iCal
             Action::ImportIcal => self.open_ical_import(),
-            Action::ExportIcal => self.export_ical(),
+            Action::ExportIcal => self.request_export(),
 
             Action::CreateTask => self.open_planner_task_form(),
             Action::PlannerOptimize => {

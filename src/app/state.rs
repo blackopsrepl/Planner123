@@ -156,6 +156,9 @@ pub struct App {
     pub google_discovered_calendars: Vec<DiscoveredGoogleCalendar>,
     pub google_discovery_index: usize,
 
+    // ── Confirmations ─────────────────────────────────────────────
+    pub pending_confirm: Option<super::confirm::Confirm>,
+
     // ── Status / loading ──────────────────────────────────────────
     pub status_message: String,
     pub status_is_error: bool,
@@ -242,6 +245,7 @@ impl App {
             google_client: None,
             google_discovered_calendars: Vec::new(),
             google_discovery_index: 0,
+            pending_confirm: None,
             status_message: String::new(),
             status_is_error: false,
             loading: true,

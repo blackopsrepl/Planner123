@@ -139,12 +139,22 @@ pub fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
     let right_width = right_text.chars().count() as u16;
 
     let budget = area.width.saturating_sub(right_width).saturating_sub(1);
-    let hints = crate::keys::hints_within(&app.view, budget);
     let mut spans: Vec<Span> = Vec::new();
-    for (key, desc) in &hints {
-        spans.push(Span::styled(format!(" {} ", key), t.status_key()));
-        spans.push(Span::styled(format!(" {} ", desc), t.status_desc()));
-        spans.push(Span::styled("  ", t.status_bar()));
+    match &app.pending_confirm {
+        /* While a confirmation is armed the only meaningful keys are the answer,
+        so the hints step aside for the question. */
+        Some(confirm) => {
+            spans.push(Span::styled(format!(" {}  ", confirm.prompt), t.error()));
+            spans.push(Span::styled("y confirm", t.status_key()));
+            spans.push(Span::styled("   any other key cancels ", t.status_desc()));
+        }
+        None => {
+            for (key, desc) in crate::keys::hints_within(&app.view, budget) {
+                spans.push(Span::styled(format!(" {} ", key), t.status_key()));
+                spans.push(Span::styled(format!(" {} ", desc), t.status_desc()));
+                spans.push(Span::styled("  ", t.status_bar()));
+            }
+        }
     }
 
     let left_line = Line::from(spans).style(t.status_bar());

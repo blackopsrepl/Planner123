@@ -12,6 +12,7 @@ use crate::models::{CognitiveLoad, PlanningTask, TaskPriority};
 use crate::sync::state::CalendarSyncState;
 use crate::worker::{Worker, WorkerResult};
 
+mod confirm;
 mod dispatch;
 mod event_form;
 mod integrations;

@@ -14,7 +14,7 @@ use crate::keys::Action as A;
 pub static MONTH: &[Binding] = &[
     b!(Month, [Char('c')], A::CreateEvent, bar!("c", "create"), help!(S::Month, "c", "Create event on selected day")),
     b!(Month, [Char('e')], A::EditEvent, bar!("e", "edit"), help!(S::Month, "e", "Edit selected event")),
-    b!(Month, [Char('d')], A::DeleteEvent, bar!("d", "del"), help!(S::Month, "d", "Delete selected event")),
+    b!(Month, [Char('d')], A::DeleteEvent, bar!("d", "del"), help!(S::Month, "d", "Delete selected event (asks first)")),
     b!(Month, [Char('/')], A::QuickAdd, bar!("/", "quick"), help!(S::Month, "/", "Quick-add event")),
     b!(Month, [Char('k'), Up], A::PrevUnit, bar!("j/k", "row"), help!(S::Month, "j / k", "Row down / up (7 days)")),
     b!(Month, [Char('j'), Down], A::NextUnit, None, None),
@@ -42,7 +42,7 @@ pub static MONTH: &[Binding] = &[
 pub static WEEK: &[Binding] = &[
     b!(Week, [Char('c')], A::CreateEvent, bar!("c", "create"), help!(S::Week, "c", "Create event")),
     b!(Week, [Char('e')], A::EditEvent, bar!("e", "edit"), help!(S::Week, "e", "Edit selected event")),
-    b!(Week, [Char('d')], A::DeleteEvent, bar!("d", "del"), help!(S::Week, "d", "Delete event")),
+    b!(Week, [Char('d')], A::DeleteEvent, bar!("d", "del"), help!(S::Week, "d", "Delete event (asks first)")),
     b!(Week, [Char('/')], A::QuickAdd, bar!("/", "quick"), None),
     b!(Week, [Char('k'), Up], A::PrevUnit, bar!("j/k", "event"), help!(S::Week, "j / k", "Next / previous event")),
     b!(Week, [Char('j'), Down], A::NextUnit, None, None),
@@ -71,7 +71,7 @@ week grid. */
 pub static DAY: &[Binding] = &[
     b!(Day, [Char('c')], A::CreateEvent, bar!("c", "create"), help!(S::Day, "c", "Create event")),
     b!(Day, [Char('e')], A::EditEvent, bar!("e", "edit"), help!(S::Day, "e", "Edit selected event")),
-    b!(Day, [Char('d')], A::DeleteEvent, bar!("d", "del"), help!(S::Day, "d", "Delete event")),
+    b!(Day, [Char('d')], A::DeleteEvent, bar!("d", "del"), help!(S::Day, "d", "Delete event (asks first)")),
     b!(Day, [Char('/')], A::QuickAdd, bar!("/", "quick"), None),
     b!(Day, [Char('k'), Up], A::PrevUnit, bar!("j/k", "event"), help!(S::Day, "j / k", "Next / previous event")),
     b!(Day, [Char('j'), Down], A::NextUnit, None, None),
@@ -99,7 +99,7 @@ pub static DAY: &[Binding] = &[
 pub static AGENDA: &[Binding] = &[
     b!(Agenda, [Char('c')], A::CreateEvent, bar!("c", "create"), help!(S::Agenda, "c", "Create event")),
     b!(Agenda, [Char('e')], A::EditEvent, bar!("e", "edit"), help!(S::Agenda, "e", "Edit selected event")),
-    b!(Agenda, [Char('d')], A::DeleteEvent, bar!("d", "del"), help!(S::Agenda, "d", "Delete event")),
+    b!(Agenda, [Char('d')], A::DeleteEvent, bar!("d", "del"), help!(S::Agenda, "d", "Delete event (asks first)")),
     b!(Agenda, [Char('/')], A::QuickAdd, bar!("/", "quick"), None),
     b!(Agenda, [Char('k'), Up], A::ScrollUp, bar!("j/k", "scroll"), help!(S::Agenda, "j / k", "Scroll")),
     b!(Agenda, [Char('j'), Down], A::ScrollDown, None, None),
