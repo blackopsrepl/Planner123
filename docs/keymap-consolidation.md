@@ -25,6 +25,8 @@ Every commit green: `make lint && make test`.
 | `feat(tui)` | `d` and export arm first: the bar shows the question, `y` commits, any other key cancels, and nothing else is bound while it is up |
 | `fix(tui)` | the status message expires after six seconds instead of owning the right-hand block for the session |
 | `fix(tui)` | the project progress bars are gone: they read a completion set nothing ever wrote |
+| `feat(tui)` | `/` filters the help overlay by typing, and the overlay opens on the surface it was opened from (`?` from the month grid leads with the month's keys, not its own) |
+| `feat(tui)` | the planner task form takes an earliest start, a deadline kind and a deadline, so a task created in the TUI can carry the constraints the planner documents |
 
 Measured effect at 80 columns, month view:
 
@@ -53,16 +55,16 @@ Two deliberate deviations from the proposal in §3–§7:
 - On an 80 column terminal the palette chip and the view switcher are the first
   chips to drop (the verbs and `?` stay). The palette is documented in the
   global section of help, but it is not on the bar at that width.
-- Help scrolls one section at a time, current surface first; it has no
-  type-to-filter of its own. The palette covers the action long tail, not the
-  help text.
 - The right-hand status zone still holds one message; there is no queue, so a
   worker result and a validation error overwrite each other (both expire now).
 - The `p` planner key is lowercase while the other surface switches (`Tab`,
   digits) are structural: §4.3 documents it as an exception rather than fixing
   it.
-- The planner task form's timing fields (earliest start, deadline) remain
-  CLI-only; the TUI form collects title, duration, calendar, priority and load.
+- The planner task form has no project field and cannot edit an existing task;
+  both exist in the CLI (`planner tasks update`).
+- The palette is an index of commands, not of keys: it does not list `d`, `c`
+  or the navigation keys, on the grounds that a key you already have is not
+  what a palette is for. If that reads as a gap, help's filter is the answer.
 
 ## 0. The decision in one paragraph
 
