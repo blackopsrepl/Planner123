@@ -10,7 +10,7 @@ use ratatui::{
 
 use crate::app::App;
 use crate::theme::theme;
-use crate::ui::util::{progress_bar, truncate};
+use crate::ui::util::truncate;
 
 pub fn render_calendar_list(app: &App, frame: &mut Frame, area: Rect) {
     let focused = app.sidebar_focused;
@@ -120,41 +120,20 @@ fn render_projects(app: &App, frame: &mut Frame, area: Rect) {
     lines.push(Line::from(Span::styled("", t.dimmed()))); // padding
 
     for proj in &app.projects {
-        // Count events in this project
-        let proj_events: Vec<&crate::models::Event> = app
+        /* Events in this project inside the loaded window. There is no
+        completion state behind this: the TUI cannot mark an event done, so the
+        panel shows what it knows instead of a fraction that could never move. */
+        let events_in_view = app
             .visible_events()
             .into_iter()
             .filter(|e| e.project_id.as_deref() == Some(&proj.id))
-            .collect();
-
-        let total = proj_events.len();
-        let completed = app
-            .completed_event_ids
-            .iter()
-            .filter(|id| proj_events.iter().any(|e| &e.id == *id))
             .count();
 
-        let fraction = if total > 0 {
-            completed as f64 / total as f64
-        } else {
-            0.0
-        };
-        let bar_width = inner_width.saturating_sub(2).min(8);
-        let (filled, empty) = progress_bar(fraction, bar_width);
-
-        // Project name
         let name = truncate(&proj.name, inner_width.saturating_sub(2));
         lines.push(Line::from(vec![
             Span::styled("\u{25b8} ", t.accent_style()), // ▸
             Span::styled(name, t.normal()),
-        ]));
-
-        // Progress bar + count
-        lines.push(Line::from(vec![
-            Span::styled("  ", t.normal()),
-            Span::styled(filled, t.progress_filled()),
-            Span::styled(empty, t.progress_empty()),
-            Span::styled(format!(" {}/{}", completed, total), t.dimmed()),
+            Span::styled(format!("  {events_in_view}"), t.dimmed()),
         ]));
     }
 

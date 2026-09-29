@@ -98,7 +98,6 @@ pub struct App {
     pub planner_settings_slot_minutes: String,
     pub planner_settings_solve_seconds: String,
     pub dag: EventDag,
-    pub completed_event_ids: HashSet<String>,
 
     // ── Sidebar state ────────────────────────────────────────────
     pub sidebar_focused: bool,
@@ -211,7 +210,6 @@ impl App {
             planner_settings_slot_minutes: "15".into(),
             planner_settings_solve_seconds: "5".into(),
             dag: EventDag::new(),
-            completed_event_ids: HashSet::new(),
             sidebar_focused: false,
             calendar_list_index: 0,
             return_view: View::Month,

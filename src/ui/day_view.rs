@@ -82,7 +82,9 @@ fn render_project_context(
         return;
     };
 
-    // Count project events and completed ones
+    /* Events of this project in the loaded window, and the DAG's next
+    actionable one. The TUI has no completion state to feed the DAG, so it
+    passes an empty set rather than a fraction it cannot keep. */
     let proj_events: Vec<&crate::models::Event> = app
         .visible_events()
         .into_iter()
@@ -90,17 +92,12 @@ fn render_project_context(
         .collect();
 
     let total = proj_events.len();
-    let completed = app
-        .completed_event_ids
-        .iter()
-        .filter(|id| proj_events.iter().any(|e| &e.id == *id))
-        .count();
 
     // Next actionable event in the project DAG
     let all_ids: Vec<&str> = proj_events.iter().map(|e| e.id.as_str()).collect();
     let actionable = app
         .dag
-        .next_actionable(all_ids.into_iter(), &app.completed_event_ids);
+        .next_actionable(all_ids.into_iter(), &std::collections::HashSet::new());
     let next_title = actionable
         .first()
         .and_then(|id| proj_events.iter().find(|e| &e.id == id))
@@ -121,7 +118,7 @@ fn render_project_context(
             format!(" {} ", project.name),
             t.accent_style().add_modifier(Modifier::BOLD),
         ),
-        Span::styled(format!(" {}/{} ", completed, total), t.dimmed()),
+        Span::styled(format!(" {} events ", total), t.dimmed()),
         Span::styled(" | Next: ", t.status_desc()),
         Span::styled(next_title, t.normal()),
         if !blocking_titles.is_empty() {

@@ -93,13 +93,3 @@ pub fn month_name(month: u32) -> &'static str {
         _ => "?",
     }
 }
-
-/* Progress bar as a string: `████░░░░` filled/total cells. */
-pub fn progress_bar(fraction: f64, width: usize) -> (String, String) {
-    let filled = ((fraction * width as f64) as usize).min(width);
-    let empty = width - filled;
-    (
-        "\u{2588}".repeat(filled), // █
-        "\u{2591}".repeat(empty),  // ░
-    )
-}
