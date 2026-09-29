@@ -231,3 +231,45 @@ fn returning_to_the_month_view_from_an_overlay_loads_the_focused_month() {
         "the month grid must re-anchor to the focused month and load it"
     );
 }
+
+#[test]
+fn enter_in_the_week_grid_opens_the_selected_event_day() {
+    let _serial = serial_guard();
+    let dir = TempDir::new().unwrap();
+    let target = offset_month_date(2);
+    let (rt, mut app) = seeded_app(
+        &dir,
+        &[(
+            &format!("{} 09:00:00", target),
+            &format!("{} 10:00:00", target),
+        )],
+    );
+
+    app.dispatch(Action::ViewWeek);
+    while app.focused_date < target {
+        app.dispatch(Action::NextPeriod);
+    }
+    assert!(
+        pump_until(&mut app, &rt, Duration::from_secs(5), |app| !app
+            .events_on_date(target)
+            .is_empty()),
+        "the week containing the seeded event must load it"
+    );
+
+    // Select the seeded event, then Enter: the day grid opens on its date.
+    for _ in 0..10 {
+        if app
+            .selected_event()
+            .map(|event| event.start_at.starts_with(&target.to_string()))
+            .unwrap_or(false)
+        {
+            break;
+        }
+        app.dispatch(Action::NextUnit);
+    }
+    app.dispatch(Action::SelectEvent);
+
+    let _guard = rt.enter();
+    assert_eq!(app.view, View::Day);
+    assert_eq!(app.focused_date, target);
+}

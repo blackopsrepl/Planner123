@@ -196,10 +196,25 @@ impl App {
 
     // ── Selected event helpers ─────────────────────────────────────
 
+    /* Enter opens the thing under the cursor: the focused day from the month
+    grid, the selected event's day from the week grid. */
     pub(super) fn select_event(&mut self) {
-        // In month view, Select means switch to day view for the focused date
-        if self.view == View::Month {
-            self.switch_view(View::Day);
+        match self.view {
+            View::Month => self.switch_view(View::Day),
+            View::Week => {
+                let date = self
+                    .selected_event()
+                    .and_then(|event| event.start_at.get(..10))
+                    .and_then(|day| NaiveDate::parse_from_str(day, "%Y-%m-%d").ok());
+                match date {
+                    Some(date) => {
+                        self.focused_date = date;
+                        self.switch_view(View::Day);
+                    }
+                    None => self.set_status("No event selected.", false),
+                }
+            }
+            _ => {}
         }
     }
 }

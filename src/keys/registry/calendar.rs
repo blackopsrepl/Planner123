@@ -35,7 +35,7 @@ pub static MONTH: &[Binding] = &[
     b!(Month, [Char('G')], A::GoogleManage, None, help!(S::Global, "G", "Open Google management")),
     b!(Month, [Char('S')], A::GoogleSync, None, help!(S::Global, "S", "Sync with Google Calendar")),
     b!(Month, [Enter], A::SelectEvent, None, help!(S::Month, "Enter", "Switch to day view")),
-    b!(Month, [Esc], A::Escape, None, None),];
+];
 
 /* Week grid: hourly time grid. Rows are in status bar order. */
 #[rustfmt::skip]
@@ -62,8 +62,8 @@ pub static WEEK: &[Binding] = &[
     b!(Week, [Char('q')], A::Quit, None, None),
     b!(Week, [Char('G')], A::GoogleManage, None, None),
     b!(Week, [Char('S')], A::GoogleSync, None, None),
-    b!(Week, [Enter], A::SelectEvent, None, None),
-    b!(Week, [Esc], A::Escape, None, None),];
+    b!(Week, [Enter], A::SelectEvent, None, help!(S::Week, "Enter", "Open the selected event's day")),
+];
 
 /* Day schedule. Navigation moves a single day, so the labels differ from the
 week grid. */
@@ -91,8 +91,7 @@ pub static DAY: &[Binding] = &[
     b!(Day, [Char('q')], A::Quit, None, None),
     b!(Day, [Char('G')], A::GoogleManage, None, None),
     b!(Day, [Char('S')], A::GoogleSync, None, None),
-    b!(Day, [Enter], A::SelectEvent, None, None),
-    b!(Day, [Esc], A::Escape, None, None),];
+];
 
 /* Agenda: the upcoming list. */
 #[rustfmt::skip]
@@ -117,5 +116,4 @@ pub static AGENDA: &[Binding] = &[
     b!(Agenda, [Char('q')], A::Quit, None, None),
     b!(Agenda, [Char('G')], A::GoogleManage, None, None),
     b!(Agenda, [Char('S')], A::GoogleSync, None, None),
-    b!(Agenda, [Enter], A::SelectEvent, None, None),
-    b!(Agenda, [Esc], A::Escape, None, None),];
+];
