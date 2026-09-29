@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.4](https://github.com/blackopsrepl/Planner123/compare/v0.6.3...v0.6.4) (2026-09-29)
+
+
+### Features
+
+* **tui:** ask before deleting or exporting 17773a0
+
+
+### Bug Fixes
+
+* **tui:** expire the status message 1de7ded
+* **tui:** stop showing project progress that can never move f310a29
+
 ## [0.6.3](https://github.com/blackopsrepl/Planner123/compare/v0.6.2...v0.6.3) (2026-09-29)
 
 
