@@ -1,14 +1,18 @@
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
-/* Top-level render dispatch — the View function in TEA.  Layout:   ┌──────────────────────────────────┐ ← Length(1) header bar   │  📅  Planner123   ...  │   ├──────────┬───────────────────────┤ ← Fill(1) main body   │Calendars │  Month / Week / Day / │   │ 22 cols  │       Agenda view     │   ├──────────┴───────────────────────┤ ← Length(1) status bar   │  h/l day  H/L month  c create…  │   └──────────────────────────────────┘  */
+/* Top-level render dispatch — the View function in TEA.
+
+Layout, top to bottom:
+
+  ┌───────────────────────────────────────┐
+  │  📅  Planner123           September…  │ ← Length(1) header bar
+  ├──────────┬────────────────────────────┤
+  │Calendars │  Month / Week / Day /      │ ← Fill(1) main body
+  │ 22 cols  │       Agenda view          │
+  ├──────────┴────────────────────────────┤
+  │  c create  e edit  d del  ? help      │ ← Length(1) status bar
+  └───────────────────────────────────────┘
+
+The status bar fills whatever is left beside the sync/time block, so the chips
+it shows depend on the terminal width (see `keys::hints_within`). */
 
 pub mod agenda_view;
 pub mod calendar_list;

@@ -1,10 +1,41 @@
 # Keymap consolidation — Planner123 ≤ v0.6.0 → target
 
-Status: **decision document, not yet implemented.**
+Status: **Phase 1 landed** (registry, status bar budget, generated help);
+phases 2–4 are open and listed in §8.
 Scope: the interactive surface only (TUI keymap, status bar, help overlay, modal
 behaviour). The JSON CLI contract is untouched.
 
 ---
+
+## 0a. What Phase 1 shipped
+
+Every commit green: `make lint && make test`.
+
+| Commit | What it did |
+| --- | --- |
+| `refactor(keys)` | `src/keys/registry` is the one table; `resolve` is a lookup over it; the status bar chips and the help overlay are derived from it; `src/keys/{navigation,forms,google,hints}.rs` are gone |
+| `fix(tui)` | the status bar has a width budget: the status block is capped at a third of the row, chips drop from the tail of a priority order, the help chip is reserved before anything else, quick add earns a chip |
+| `refactor(tui)` | the help overlay is generated per surface, opens on the surface you are in, and resets its scroll |
+
+Measured effect at 80 columns, month view:
+
+```text
+ before |  h/l  day   H/L  month   j/k  row   n  today   c  crea  google off 14:22
+ after  |  c create  e edit  d del  / quick  ? help      |  google off  14:22
+```
+
+Tests that now hold the line: no key bound twice in a surface, the text wildcard
+never shadowing an explicit character, every `Action` reachable or listed as
+internal, every documented global key really bound, the bar chips per surface,
+the budget invariant at 80/100/120/160 columns, the help section order and fit,
+and every bar chip explained somewhere in help.
+
+Still open from §1.4: the dead `g` binding, the `i`/`s`/`n` overloads, `x`'s
+silent export, `d` without a confirmation, overlays returning to Month rather
+than to where they came from, and the never-expiring status message (its *width*
+is now bounded, its lifetime is not). Those are phase 2–3 work, as is one
+residual on a 24-row terminal: the current section plus GLOBAL is 22 rows
+against 18 visible, so the global keys still need a scroll.
 
 ## 0. The decision in one paragraph
 
@@ -109,11 +140,11 @@ therefore invisible to CI:
 | 13 | `d` deletes immediately — no confirmation, no undo | `src/app/integrations.rs:200-204` |
 | 14 | Sidebar Projects progress bars can never move: `completed_event_ids` is initialised empty and never written | `src/app/state.rs:101,199`, `src/ui/calendar_list.rs:131-138` |
 
-### 1.5 Also found while measuring (unrelated to the keymap)
+### 1.5 Also found while measuring
 
-- `src/ui/mod.rs:1-11` and `src/ui/status_bar.rs:1-2` carry the same header
-  comment repeated 11× and 2× respectively — an artifact of whatever tool
-  prepended them.
+- `src/ui/mod.rs` and `src/ui/status_bar.rs` carried the same header comment
+  repeated 11× and 2× (a tooling artifact). Both are fixed; `ui/mod.rs` now
+  sketches the layout it actually renders.
 - The TUI has no dependency/DAG surface at all (dependencies are CLI-only),
   yet day view and the sidebar read DAG/completion state that can never change
   in the TUI.

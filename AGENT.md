@@ -32,7 +32,8 @@ Direct cargo commands used in CI:
 - `src/app.rs` and `src/app/`: stable TUI facade plus state, dispatch, navigation, forms, planner, integrations, and worker-result modules
 - `src/cli.rs` and `src/cli/`: stable typed CLI facade plus arguments, handlers, runtime, validation, and backend modules
 - `src/calendar_service.rs` and `src/calendar_service/`: shared calendar facade plus validation, mutation, and test modules
-- `src/event_service.rs` and `src/event_service/`: shared event facade plus validation, mutation, and test modules
+- `src/event_service.rs` and `src/event_service/`: shared event facade plus validation and mutation modules
+- `src/keys.rs` and `src/keys/registry/`: the keymap. One table holds every binding, and `resolve`, the status bar chips and the help overlay all read it, so they cannot drift apart. Add or move a key here, never in a renderer
 - `src/ical.rs` and `src/ical/`: `.ics` facade plus parsing, candidate, time, import/export, and test modules
 - `src/google/`: OAuth, calendar discovery, typed event API, and Google payload mapping; its larger concerns use the same facade-plus-fragments pattern
 - `src/sync/`: sync engine, pull, push, conflicts, and persisted sync-state helpers, each split by responsibility
@@ -40,7 +41,9 @@ Direct cargo commands used in CI:
 - `src/planner.rs` and `src/planner/`: planner facade plus settings, tasks, availability, optimization, proposal lifecycle, evidence, and tests
 - `src/models.rs` and `src/models/`: stable data-model facade plus calendar, event, dependency, planning, and proposal types
 - `tests/cli.rs` and `tests/cli/`: binary-level CLI integration facade plus command-family test modules
+- `tests/keymap.rs` and `tests/help_overlay.rs`: keymap invariants (no key bound twice, every action reachable, documented keys really bound, status bar chips and budget) and help overlay order and size
 - `docs/wireframes/`: ASCII references for the CLI and TUI surfaces
+- `docs/keymap-consolidation.md`: why the keymap looks the way it does, and what is still to consolidate
 
 ## Constraints
 
