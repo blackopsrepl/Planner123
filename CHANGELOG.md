@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.3](https://github.com/blackopsrepl/Planner123/compare/v0.6.2...v0.6.3) (2026-09-29)
+
+
+### Features
+
+* **keys:** apply a planner proposal with A ea7dc92
+* **keys:** one way to change a select value, on every form bd8e80c
+* **keys:** take the rare actions off the top-level letters 5a96565
+* **tui:** add a command palette and a working go-to-date 5746b46
+
+
+### Bug Fixes
+
+* **tui:** return overlays to the view they were opened from 8bc26ca
+
 ## [0.6.2](https://github.com/blackopsrepl/Planner123/compare/v0.6.1...v0.6.2) (2026-09-29)
 
 
