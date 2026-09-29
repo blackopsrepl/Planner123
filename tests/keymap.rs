@@ -129,18 +129,17 @@ fn documented_global_keys_are_really_bound() {
     }
 }
 
-/* The status bar as it shipped before the registry existed. This pins the
-generated chips to the reviewed table: any change to the bar has to change
-this test on purpose.
-
-One row differs from the pre-registry bar on purpose: Day view said `h/l week`
-while the key moves a single day. */
+/* The status bar as the registry orders it: verbs first, then the selection
+keys, then the structural keys, then the date navigation (which the help
+overlay documents in full). Two rows differ from the pre-registry bar on
+purpose: Day view said `h/l week` while the key moves a single day, and quick
+add (`/`) is a verb and now earns a chip. */
 #[rustfmt::skip]
-const LEGACY_BAR: &[(View, &[&str])] = &[
-    (View::Month, &["h/l day", "H/L month", "j/k row", "n today", "c create", "e edit", "d del", "1-4 view", "Tab sidebar", "p planner", "? help"]),
-    (View::Week, &["h/l week", "j/k event", "n now", "c create", "e edit", "d del", "1-4 view", "Tab sidebar", "p planner", "? help"]),
-    (View::Day, &["h/l day", "j/k event", "n now", "c create", "e edit", "d del", "1-4 view", "Tab sidebar", "p planner", "? help"]),
-    (View::Agenda, &["j/k scroll", "n today", "c create", "e edit", "d del", "1-4 view", "p planner", "? help"]),
+const EXPECTED_BAR: &[(View, &[&str])] = &[
+    (View::Month, &["c create", "e edit", "d del", "/ quick", "j/k row", "1-4 view", "Tab sidebar", "p planner", "n today", "? help"]),
+    (View::Week, &["c create", "e edit", "d del", "/ quick", "j/k event", "1-4 view", "Tab sidebar", "p planner", "n now", "? help"]),
+    (View::Day, &["c create", "e edit", "d del", "/ quick", "j/k event", "1-4 view", "Tab sidebar", "p planner", "n now", "? help"]),
+    (View::Agenda, &["c create", "e edit", "d del", "/ quick", "j/k scroll", "1-4 view", "p planner", "n today", "? help"]),
     (View::CalendarList, &["j/k nav", "Space toggle", "Tab main", "? help"]),
     (View::EventForm, &["Tab/↑↓ field", "Enter save", "Esc cancel"]),
     (View::IcalImport, &["Tab/↑↓ field", "Enter import", "Esc cancel"]),
@@ -155,7 +154,7 @@ const LEGACY_BAR: &[(View, &[&str])] = &[
 
 #[test]
 fn status_bar_chips_match_the_reviewed_table() {
-    for (view, expected) in LEGACY_BAR {
+    for (view, expected) in EXPECTED_BAR {
         let rendered: Vec<String> = keys::hints(view)
             .into_iter()
             .map(|(k, d)| format!("{k} {d}"))
@@ -166,26 +165,30 @@ fn status_bar_chips_match_the_reviewed_table() {
 
 #[test]
 fn a_wide_bar_keeps_every_chip() {
-    for (view, expected) in LEGACY_BAR {
+    for (view, expected) in EXPECTED_BAR {
         assert_eq!(
-            keys::bar_hints_within(Context::of(view), 500).len(),
-            expected.len()
+            keys::hints_within(view, 500).len(),
+            expected.len(),
+            "{view:?} dropped a chip it had room for"
         );
     }
 }
 
 #[test]
 fn a_narrow_bar_drops_the_tail_and_keeps_help() {
-    for (view, _) in LEGACY_BAR {
+    for (view, expected) in EXPECTED_BAR {
         for budget in [80u16, 100, 120, 160] {
-            let chips = keys::bar_hints_within(Context::of(view), budget);
+            let chips = keys::hints_within(view, budget);
             let width: usize = chips.iter().map(keys::hint_width).sum();
             assert!(
                 width <= budget as usize,
                 "{view:?} overflows a {budget} column budget with {width} columns"
             );
-            let pins = keys::bar_hints(Context::of(view)).contains(&("?", "help"));
-            if pins {
+            assert!(
+                chips.len() <= expected.len(),
+                "{view:?} invented a chip for a {budget} column budget"
+            );
+            if expected.contains(&"? help") {
                 assert_eq!(
                     chips.last(),
                     Some(&("?", "help")),
@@ -193,6 +196,21 @@ fn a_narrow_bar_drops_the_tail_and_keeps_help() {
                 );
             }
         }
+    }
+}
+
+/* A 80 column terminal is the common case this whole exercise is about: the
+verbs must survive there. */
+#[test]
+fn narrow_bars_keep_the_verbs() {
+    for view in [View::Month, View::Week, View::Day] {
+        let chips = keys::hints_within(&view, 60);
+        let keys_shown: Vec<&str> = chips.iter().map(|(key, _)| *key).collect();
+        assert_eq!(
+            keys_shown,
+            vec!["c", "e", "d", "/", "?"],
+            "{view:?} lost a verb on a narrow bar"
+        );
     }
 }
 

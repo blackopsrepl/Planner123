@@ -1,5 +1,4 @@
 /* Header bar (top, 1 row) + status bar (bottom, 1 row). Visual twin of solverforge-mail's status_bar.rs.  */
-/* Header bar (top, 1 row) + status bar (bottom, 1 row). Visual twin of solverforge-mail's status_bar.rs.  */
 
 use chrono::Local;
 use ratatui::{
@@ -60,19 +59,14 @@ pub fn render_header(app: &App, frame: &mut Frame, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-/* Render the bottom status bar (1 row). */
+/* Render the bottom status bar (1 row).
+
+The row is shared: the status block owns a bounded share on the right and the
+key chips take what is left. Chips are dropped from the tail of their priority
+order rather than clipped, so the bar never shows half a hint, and the chip
+that opens help is reserved before anything else. */
 pub fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
     let t = theme();
-
-    // Build key hint spans
-    let hints = crate::keys::hints(&app.view);
-    let mut spans: Vec<Span> = Vec::new();
-
-    for (key, desc) in &hints {
-        spans.push(Span::styled(format!(" {} ", key), t.status_key()));
-        spans.push(Span::styled(format!(" {} ", desc), t.status_desc()));
-        spans.push(Span::styled("  ", t.status_bar()));
-    }
 
     // Right side: status message or spinner
     let right = if app.loading {
@@ -134,18 +128,30 @@ pub fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
         Span::styled(format!(" {}  {} ", google_state, now), style)
     };
 
-    // Left-align hints, right-align status (simplified: just concat)
-    let left_line = Line::from(spans).style(t.status_bar());
+    /* The status block is capped so a long error message cannot take the bar
+    from the key hints, and the hints are budgeted against what it actually
+    uses. */
+    let right_text = crate::ui::util::truncate(
+        right.content.as_ref(),
+        status_block_limit(area.width) as usize,
+    );
+    let right_style = right.style;
+    let right_width = right_text.chars().count() as u16;
 
-    // We render two overlapping paragraphs: left for hints, right for status
+    let budget = area.width.saturating_sub(right_width).saturating_sub(1);
+    let hints = crate::keys::hints_within(&app.view, budget);
+    let mut spans: Vec<Span> = Vec::new();
+    for (key, desc) in &hints {
+        spans.push(Span::styled(format!(" {} ", key), t.status_key()));
+        spans.push(Span::styled(format!(" {} ", desc), t.status_desc()));
+        spans.push(Span::styled("  ", t.status_bar()));
+    }
+
+    let left_line = Line::from(spans).style(t.status_bar());
     let left_para = Paragraph::new(left_line).style(t.status_bar());
     frame.render_widget(left_para, area);
 
-    // Render right-side status (use a right-aligned paragraph)
-    let right_text = right.content.to_string();
-    let right_style = right.style;
-    let right_width = right_text.chars().count() as u16;
-    if right_width < area.width {
+    if right_width <= area.width {
         let right_area = Rect {
             x: area.x + area.width - right_width,
             y: area.y,
@@ -155,4 +161,10 @@ pub fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
         let right_para = Paragraph::new(right_text).style(right_style);
         frame.render_widget(right_para, right_area);
     }
+}
+
+/* The widest the status block may be: a third of the bar, never more than the
+bar minus the room a single hint needs. */
+fn status_block_limit(width: u16) -> u16 {
+    (width / 3).max(16).min(width.saturating_sub(8))
 }

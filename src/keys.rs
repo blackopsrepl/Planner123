@@ -120,3 +120,8 @@ pub fn resolve(view: &View, key: KeyEvent) -> Action {
 pub fn hints(view: &View) -> Vec<Hint> {
     bar_hints(Context::of(view))
 }
+
+/* The status bar chips of a view that fit `budget` columns. */
+pub fn hints_within(view: &View, budget: u16) -> Vec<Hint> {
+    bar_hints_within(Context::of(view), budget)
+}
