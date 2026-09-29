@@ -2,6 +2,7 @@ use super::*;
 impl App {
     pub fn handle_tick(&mut self) {
         self.tick_count = self.tick_count.wrapping_add(1);
+        self.expire_status();
 
         // Poll worker for results
         for result in self.worker.drain() {

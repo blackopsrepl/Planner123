@@ -162,6 +162,8 @@ pub struct App {
     // ── Status / loading ──────────────────────────────────────────
     pub status_message: String,
     pub status_is_error: bool,
+    /// Tick at which `status_message` was set: a message is news, not furniture.
+    pub status_set_tick: u64,
     pub loading: bool,
     pub tick_count: u64,
 
@@ -248,6 +250,7 @@ impl App {
             pending_confirm: None,
             status_message: String::new(),
             status_is_error: false,
+            status_set_tick: 0,
             loading: true,
             tick_count: 0,
             events_arc,

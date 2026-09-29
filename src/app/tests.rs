@@ -1,6 +1,7 @@
 use chrono::NaiveDate;
 
 use super::palette::{commands, fuzzy_match, parse_date_input};
+use super::query::{status_is_stale, STATUS_TICKS};
 use super::utilities::google_sync_finished_status;
 use crate::keys::Action;
 
@@ -62,4 +63,12 @@ fn the_palette_offers_the_actions_that_lost_their_keys() {
             "{action:?} has no key and no palette entry"
         );
     }
+}
+
+#[test]
+fn a_status_message_expires_after_its_ticks() {
+    assert!(!status_is_stale(0, 0));
+    assert!(!status_is_stale(10, 10 + STATUS_TICKS - 1));
+    assert!(status_is_stale(10, 10 + STATUS_TICKS));
+    assert!(status_is_stale(10, 10_000));
 }

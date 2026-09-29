@@ -44,11 +44,26 @@ impl App {
     pub fn set_status(&mut self, msg: impl Into<String>, is_error: bool) {
         self.status_message = msg.into();
         self.status_is_error = is_error;
+        self.status_set_tick = self.tick_count;
     }
 
     /// True if the cursor should be visible (500ms on, 500ms off at 250ms tick rate).
     pub fn cursor_visible(&self) -> bool {
         self.tick_count % 4 < 2
+    }
+
+    // ── Status lifetime ───────────────────────────────────────────
+
+    /* Drop a status message once it has been on screen long enough to read.
+
+    Without this the right-hand block belonged to the last thing that happened:
+    an export path or a validation error sat there for the rest of the session,
+    covering the sync state and the clock. */
+    pub(super) fn expire_status(&mut self) {
+        if status_is_stale(self.status_set_tick, self.tick_count) {
+            self.status_message.clear();
+            self.status_is_error = false;
+        }
     }
 
     // ── Scroll helpers ────────────────────────────────────────────
@@ -90,4 +105,11 @@ impl App {
             _ => {}
         }
     }
+}
+
+/* Status messages live for `STATUS_TICKS` ticks (four per second). */
+pub const STATUS_TICKS: u64 = 24;
+
+pub fn status_is_stale(set_tick: u64, now: u64) -> bool {
+    now.saturating_sub(set_tick) >= STATUS_TICKS
 }
