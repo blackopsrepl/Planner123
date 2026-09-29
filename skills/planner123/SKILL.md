@@ -228,6 +228,14 @@ Rules that keep changes mergeable:
   the tag/message/URL formats — the tool owns all of them, so a missing or
   incomplete surface silently survives a release. Order: `make pre-release`,
   then the tool, then push the branch and the tag to every remote.
+- **One release per coherent iteration, at the moment it lands.** Tag each
+  finished change-set (a feature, a fix batch, a subsystem) as soon as its work
+  is green, instead of accumulating commits and cutting one release for several
+  iterations: the version history is the project's changelog, and batching
+  flattens it. Below 1.0.0 the tool bumps a patch for features and a minor only
+  for a breaking change, so per-iteration releases are cheap (`v0.6.1`,
+  `v0.6.2`, …) — run the tool and report the number it computed rather than
+  predicting it.
 
 ## Troubleshooting
 

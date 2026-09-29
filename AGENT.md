@@ -63,6 +63,8 @@ Before pushing changes:
 2. Run `make test`
 3. If binaries changed materially, run `make build`
 4. Before tagging or pushing a release version, run `make pre-release`
+5. Cut one release per coherent iteration as soon as it is green — do not
+   accumulate several iterations and release them together
 
 If you touch the CLI contract, update:
 
