@@ -1,7 +1,8 @@
 use chrono::NaiveDate;
 
-use super::palette::{fuzzy_match, parse_date_input};
+use super::palette::{commands, fuzzy_match, parse_date_input};
 use super::utilities::google_sync_finished_status;
+use crate::keys::Action;
 
 #[test]
 fn google_sync_finished_status_prefers_failure_over_success_banner() {
@@ -44,4 +45,21 @@ fn date_input_accepts_iso_dates_and_day_offsets() {
     assert!(parse_date_input("tomorrow", today).is_err());
     assert!(parse_date_input("+soon", today).is_err());
     assert!(parse_date_input("2026-13-01", today).is_err());
+}
+
+/* Three actions lost their top-level key to the palette. If one of them falls
+out of the command list it becomes unreachable, which no other test would
+notice. */
+#[test]
+fn the_palette_offers_the_actions_that_lost_their_keys() {
+    let offered: Vec<Action> = commands()
+        .into_iter()
+        .map(|command| command.action)
+        .collect();
+    for action in [Action::JumpToDate, Action::ImportIcal, Action::ExportIcal] {
+        assert!(
+            offered.contains(&action),
+            "{action:?} has no key and no palette entry"
+        );
+    }
 }

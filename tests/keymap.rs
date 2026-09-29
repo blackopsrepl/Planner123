@@ -49,6 +49,10 @@ const ACTIONS: &[Action] = &[
 /* Actions that are deliberately not bound to a key. */
 const INTERNAL: &[Action] = &[Action::None];
 
+/* Actions that lost their letter to the `:` palette. `src/app/tests.rs` checks
+the palette really offers each of them, so this list cannot rot into a claim. */
+const PALETTE_ONLY: &[Action] = &[Action::JumpToDate, Action::ImportIcal, Action::ExportIcal];
+
 #[test]
 fn no_surface_binds_a_key_twice() {
     for context in keys::contexts() {
@@ -97,8 +101,8 @@ fn every_action_is_reachable_from_the_keymap() {
 
     for action in ACTIONS {
         assert!(
-            bound.contains(action) || INTERNAL.contains(action),
-            "{action:?} is not bound to any key"
+            bound.contains(action) || INTERNAL.contains(action) || PALETTE_ONLY.contains(action),
+            "{action:?} is neither bound to a key, internal, nor reachable from the palette"
         );
     }
 }
@@ -148,7 +152,7 @@ const EXPECTED_BAR: &[(View, &[&str])] = &[
     (View::Palette, &["↑/↓ move", "Enter run", "Esc close"]),
     (View::DateJump, &["Enter go", "Esc cancel"]),
     (View::Help, &["j/k scroll", "Esc close"]),
-    (View::GoogleManage, &["j/k nav", "i import", "r refresh", "l login", "o logout", "s sync", "Esc close"]),
+    (View::GoogleManage, &["j/k nav", "Enter import", "r refresh", "l login", "o logout", "S sync", "Esc close"]),
     (View::GoogleAuth, &["Tab field", "Enter confirm", "Esc cancel"]),
     (View::PlannerInbox, &["j/k inspect task", "n new task", "o optimize", "a apply", "s settings", "Esc close"]),
     (View::PlannerTaskForm, &["Tab/↑↓ field", "Enter save", "Esc cancel"]),
@@ -226,7 +230,6 @@ fn representative_keys_resolve_as_before() {
     let cases: &[(View, KeyEvent, Action)] = &[
         (View::Month, char_key('h'), Action::PrevDay),
         (View::Month, char_key('H'), Action::PrevPeriod),
-        (View::Month, char_key('g'), Action::JumpToDate),
         (View::Month, key(KeyCode::Enter), Action::SelectEvent),
         (View::Month, char_key('1'), Action::ViewMonth),
         (View::Month, char_key(':'), Action::Palette),
@@ -252,8 +255,18 @@ fn representative_keys_resolve_as_before() {
         (View::QuickAdd, key(KeyCode::Enter), Action::InputSubmit),
         (View::GoogleAuth, char_key('q'), Action::Escape),
         (View::GoogleManage, char_key('S'), Action::GoogleSync),
-        (View::GoogleManage, char_key('s'), Action::GoogleSync),
+        (View::GoogleManage, char_key('s'), Action::None),
+        (
+            View::GoogleManage,
+            key(KeyCode::Enter),
+            Action::GoogleImportCalendar,
+        ),
+        (View::GoogleManage, char_key('i'), Action::None),
         (View::GoogleManage, char_key('o'), Action::GoogleAuthLogout),
+        (View::Month, char_key('g'), Action::None),
+        (View::Month, char_key('i'), Action::None),
+        (View::Month, char_key('x'), Action::None),
+        (View::CalendarList, char_key('G'), Action::None),
         (View::PlannerInbox, char_key('s'), Action::PlannerSettings),
         (View::PlannerInbox, char_key('a'), Action::PlannerApply),
         (View::Help, char_key('?'), Action::Escape),

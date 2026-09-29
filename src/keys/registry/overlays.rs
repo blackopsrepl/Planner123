@@ -21,8 +21,6 @@ pub static GLOBAL: &[Binding] = &[
     b!(Global, [Tab], A::FocusSidebar, None, help!(S::Global, "Tab", "Focus calendar sidebar")),
     b!(Global, [Char('G')], A::GoogleManage, None, help!(S::Global, "G", "Open Google management")),
     b!(Global, [Char('S')], A::GoogleSync, None, help!(S::Global, "S", "Sync with Google Calendar")),
-    b!(Global, [Char('i')], A::ImportIcal, None, help!(S::Global, "i", "Open .ics import")),
-    b!(Global, [Char('x')], A::ExportIcal, None, help!(S::Global, "x", "Export .ics file")),
 ];
 
 /* Calendar sidebar: visibility toggles plus the surface-owned keys. */
@@ -36,10 +34,6 @@ pub static CALENDAR_LIST: &[Binding] = &[
     b!(pin CalendarList, [Char('?')], A::Help, bar!("?", "help"), help!(S::Global, "?", "Toggle this help")),
     b!(CalendarList, [Char('c')], A::CreateEvent, None, None),
     b!(CalendarList, [Char('q')], A::Quit, None, None),
-    b!(CalendarList, [Char('G')], A::GoogleManage, None, None),
-    b!(CalendarList, [Char('S')], A::GoogleSync, None, None),
-    b!(CalendarList, [Char('i')], A::ImportIcal, None, None),
-    b!(CalendarList, [Char('x')], A::ExportIcal, None, None),
 ];
 
 /* Event, planner task and planner settings forms share one key set: fields
@@ -115,11 +109,11 @@ pub static HELP: &[Binding] = &[
 pub static GOOGLE_MANAGE: &[Binding] = &[
     b!(GoogleManage, [Char('k'), Up], A::CalendarUp, bar!("j/k", "nav"), help!(S::GoogleManage, "j / k", "Move through discoverable calendars")),
     b!(GoogleManage, [Char('j'), Down], A::CalendarDown, None, None),
-    b!(GoogleManage, [Char('i'), Enter], A::GoogleImportCalendar, bar!("i", "import"), help!(S::GoogleManage, "i / Enter", "Import selected Google calendar")),
+    b!(GoogleManage, [Enter], A::GoogleImportCalendar, bar!("Enter", "import"), help!(S::GoogleManage, "Enter", "Import selected Google calendar")),
     b!(GoogleManage, [Char('r')], A::GoogleDiscoverCalendars, bar!("r", "refresh"), help!(S::GoogleManage, "r", "Refresh calendar discovery")),
     b!(GoogleManage, [Char('l')], A::GoogleLogin, bar!("l", "login"), help!(S::GoogleManage, "l", "Login / reconnect")),
     b!(GoogleManage, [Char('o')], A::GoogleAuthLogout, bar!("o", "logout"), help!(S::GoogleManage, "o", "Logout")),
-    b!(GoogleManage, [Char('s'), Char('S')], A::GoogleSync, bar!("s", "sync"), help!(S::GoogleManage, "s", "Sync now")),
+    b!(GoogleManage, [Char('S')], A::GoogleSync, bar!("S", "sync"), help!(S::GoogleManage, "S", "Sync now")),
     b!(GoogleManage, [Esc, Char('q')], A::Escape, bar!("Esc", "close"), help!(S::GoogleManage, "Esc", "Close")),
 ];
 

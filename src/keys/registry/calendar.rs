@@ -34,9 +34,6 @@ pub static MONTH: &[Binding] = &[
     b!(Month, [Char('q')], A::Quit, None, help!(S::Global, "q / Ctrl+C", "Quit")),
     b!(Month, [Char('G')], A::GoogleManage, None, help!(S::Global, "G", "Open Google management")),
     b!(Month, [Char('S')], A::GoogleSync, None, help!(S::Global, "S", "Sync with Google Calendar")),
-    b!(Month, [Char('i')], A::ImportIcal, None, help!(S::Global, "i", "Open .ics import")),
-    b!(Month, [Char('x')], A::ExportIcal, None, help!(S::Global, "x", "Export .ics file")),
-    b!(Month, [Char('g')], A::JumpToDate, None, None),
     b!(Month, [Enter], A::SelectEvent, None, help!(S::Month, "Enter", "Switch to day view")),
     b!(Month, [Esc], A::Escape, None, None),];
 
@@ -65,8 +62,6 @@ pub static WEEK: &[Binding] = &[
     b!(Week, [Char('q')], A::Quit, None, None),
     b!(Week, [Char('G')], A::GoogleManage, None, None),
     b!(Week, [Char('S')], A::GoogleSync, None, None),
-    b!(Week, [Char('i')], A::ImportIcal, None, None),
-    b!(Week, [Char('x')], A::ExportIcal, None, None),
     b!(Week, [Enter], A::SelectEvent, None, None),
     b!(Week, [Esc], A::Escape, None, None),];
 
@@ -96,8 +91,6 @@ pub static DAY: &[Binding] = &[
     b!(Day, [Char('q')], A::Quit, None, None),
     b!(Day, [Char('G')], A::GoogleManage, None, None),
     b!(Day, [Char('S')], A::GoogleSync, None, None),
-    b!(Day, [Char('i')], A::ImportIcal, None, None),
-    b!(Day, [Char('x')], A::ExportIcal, None, None),
     b!(Day, [Enter], A::SelectEvent, None, None),
     b!(Day, [Esc], A::Escape, None, None),];
 
@@ -124,7 +117,5 @@ pub static AGENDA: &[Binding] = &[
     b!(Agenda, [Char('q')], A::Quit, None, None),
     b!(Agenda, [Char('G')], A::GoogleManage, None, None),
     b!(Agenda, [Char('S')], A::GoogleSync, None, None),
-    b!(Agenda, [Char('i')], A::ImportIcal, None, None),
-    b!(Agenda, [Char('x')], A::ExportIcal, None, None),
     b!(Agenda, [Enter], A::SelectEvent, None, None),
     b!(Agenda, [Esc], A::Escape, None, None),];
