@@ -138,7 +138,7 @@ pub static PLANNER_INBOX: &[Binding] = &[
     b!(PlannerInbox, [Char('k'), Up], A::PrevUnit, None, None),
     b!(PlannerInbox, [Char('n')], A::CreateTask, bar!("n", "new task"), help!(S::Planner, "n", "Create planner task")),
     b!(PlannerInbox, [Char('o')], A::PlannerOptimize, bar!("o", "optimize"), help!(S::Planner, "o", "Optimize inbox into a proposal")),
-    b!(PlannerInbox, [Char('a')], A::PlannerApply, bar!("a", "apply"), help!(S::Planner, "a", "Apply the reviewed proposal")),
+    b!(PlannerInbox, [Char('A')], A::PlannerApply, bar!("A", "apply"), help!(S::Planner, "A", "Apply the reviewed proposal (writes events)")),
     b!(PlannerInbox, [Char('s')], A::PlannerSettings, bar!("s", "settings"), help!(S::Planner, "s", "Configure planner settings")),
     b!(PlannerInbox, [], A::None, None, help!(S::Planner, "Timezone", "IANA name: Europe/Rome or UTC (detected local shown)")),
     b!(PlannerInbox, [], A::None, None, help!(S::Planner, "Availability", "day=HH:MM-HH:MM, comma-separated; e.g. mon=09:00-17:00 (full days accepted)")),

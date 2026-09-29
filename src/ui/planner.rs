@@ -113,7 +113,7 @@ pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
                 detail.items.len()
             ))];
             text.push(Line::from(if detail.proposal.status == "ready" {
-                "Press a to apply this reviewed proposal."
+                "Press A to apply this reviewed proposal."
             } else {
                 "This proposal has already been applied."
             }));

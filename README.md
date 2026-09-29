@@ -101,7 +101,7 @@ calendar and hands you a plan — which you approve before anything changes.
 3. **Optimize** — press `o`. The solver runs for a few seconds and produces a
    proposal: concrete slots for every task it could place.
 4. **Review** — read the proposal. Check the times. Nothing has happened yet.
-5. **Apply** — press `a` (or `planner proposals apply` in the CLI). Only now
+5. **Apply** — press `A` (or `planner proposals apply` in the CLI). Only now
    do the tasks become real events on your calendar.
 
 ![Reviewed proposal ready to apply](assets/screenshot-planner-proposal.png)
