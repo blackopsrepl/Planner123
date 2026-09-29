@@ -18,16 +18,34 @@ impl App {
         self.planner_task_field = self.planner_task_field.checked_sub(1).unwrap_or(4);
     }
 
+    /* Text fields take characters; select fields cycle with h / l (and the
+    arrow keys bound to them). Typing any key used to cycle them, which made
+    every letter ambiguous inside a form. */
     pub(super) fn planner_task_input_char(&mut self, c: char) {
         match self.planner_task_field {
             0 => self.planner_task_title.push(c),
             1 if c.is_ascii_digit() => self.planner_task_duration.push(c),
-            2 if !self.calendars.is_empty() => {
+            2 if c == 'l' && !self.calendars.is_empty() => {
                 self.planner_task_calendar_index =
                     (self.planner_task_calendar_index + 1) % self.calendars.len();
             }
-            3 => self.planner_task_priority_index = (self.planner_task_priority_index + 1) % 3,
-            4 => self.planner_task_cognitive_index = (self.planner_task_cognitive_index + 1) % 3,
+            2 if c == 'h' && !self.calendars.is_empty() => {
+                self.planner_task_calendar_index =
+                    (self.planner_task_calendar_index + self.calendars.len() - 1)
+                        % self.calendars.len();
+            }
+            3 if c == 'l' => {
+                self.planner_task_priority_index = (self.planner_task_priority_index + 1) % 3
+            }
+            3 if c == 'h' => {
+                self.planner_task_priority_index = (self.planner_task_priority_index + 2) % 3
+            }
+            4 if c == 'l' => {
+                self.planner_task_cognitive_index = (self.planner_task_cognitive_index + 1) % 3
+            }
+            4 if c == 'h' => {
+                self.planner_task_cognitive_index = (self.planner_task_cognitive_index + 2) % 3
+            }
             _ => {}
         }
     }

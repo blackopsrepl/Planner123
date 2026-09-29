@@ -35,11 +35,9 @@ impl App {
         match self.ical_import_field_index {
             0 => self.ical_import_path.push(c),
             1 => {
-                if (c == 'h' || c == '-') && self.ical_import_calendar_index > 0 {
+                if c == 'h' && self.ical_import_calendar_index > 0 {
                     self.ical_import_calendar_index -= 1;
-                } else if (c == 'l' || c == '+')
-                    && self.ical_import_calendar_index + 1 < self.calendars.len()
-                {
+                } else if c == 'l' && self.ical_import_calendar_index + 1 < self.calendars.len() {
                     self.ical_import_calendar_index += 1;
                 }
             }

@@ -250,14 +250,17 @@ pub fn resolve(context: Context, event: KeyEvent) -> Action {
         .unwrap_or(Action::None)
 }
 
-/* The action a matched row dispatches. The text-field wildcard carries the
-character that was pressed, which only the key event knows. */
+/* The action a matched row dispatches.
+
+Only the text-field wildcard substitutes the pressed character. A named key
+mapped onto the input path (an arrow key standing in for `h`, so every surface
+cycles a select value the same way) dispatches the character it names. */
 fn action_for(row: &Binding, event: KeyEvent) -> Action {
-    match row.action {
-        Action::InputChar(_) => match event.code {
-            KeyCode::Char(character) => Action::InputChar(character),
-            _ => Action::None,
-        },
-        ref action => action.clone(),
+    let wildcard = matches!(row.keys, [Key::AnyChar]);
+    match (row.action.clone(), event.code) {
+        (Action::InputChar(_), KeyCode::Char(character)) if wildcard => {
+            Action::InputChar(character)
+        }
+        (action, _) => action,
     }
 }

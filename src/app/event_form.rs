@@ -126,22 +126,23 @@ impl App {
             Some(FormField::Timezone) => self.form_timezone.push(c),
             Some(FormField::Recurrence) => self.form_rrule.push(c),
             Some(FormField::Reminder) if c.is_ascii_digit() => self.form_reminder.push(c),
+            // Select fields cycle one way only: h / l, and the arrow keys the
+            // registry maps onto them.
             Some(FormField::Calendar) => {
-                // Cycle through calendars with +/-
-                if c == '+' || c == 'l' {
+                if c == 'l' {
                     if self.form_calendar_index + 1 < self.calendars.len() {
                         self.form_calendar_index += 1;
                     }
-                } else if (c == '-' || c == 'h') && self.form_calendar_index > 0 {
+                } else if c == 'h' && self.form_calendar_index > 0 {
                     self.form_calendar_index -= 1;
                 }
             }
             Some(FormField::Project) => {
-                if c == '+' || c == 'l' {
+                if c == 'l' {
                     if self.form_project_index < self.projects.len() {
                         self.form_project_index += 1;
                     }
-                } else if (c == '-' || c == 'h') && self.form_project_index > 0 {
+                } else if c == 'h' && self.form_project_index > 0 {
                     self.form_project_index -= 1;
                 }
             }

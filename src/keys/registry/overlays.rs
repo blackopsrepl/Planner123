@@ -43,7 +43,9 @@ typing left and right, which is why the character wildcard sits last. */
 pub static EVENT_FORM: &[Binding] = &[
     b!(EventForm, [Tab, Down], A::FormNextField, bar!("Tab/↑↓", "field"), help!(S::EventForm, "Tab / ↓", "Next field")),
     b!(EventForm, [BackTab, Up], A::FormPrevField, None, help!(S::EventForm, "Shift+Tab / ↑", "Previous field")),
-    b!(EventForm, [], A::None, None, help!(S::EventForm, "h / l (on selects)", "Previous / next option")),
+    b!(EventForm, [Left], A::InputChar('h'), None, None),
+    b!(EventForm, [Right], A::InputChar('l'), None, None),
+    b!(EventForm, [], A::None, None, help!(S::EventForm, "← / → (or h / l)", "Previous / next option, on a select")),
     b!(EventForm, [], A::None, None, help!(S::EventForm, "Space (on AllDay)", "Toggle")),
     b!(EventForm, [Enter], A::FormSubmit, bar!("Enter", "save"), help!(S::EventForm, "Enter", "Save event")),
     b!(EventForm, [Esc], A::FormCancel, bar!("Esc", "cancel"), help!(S::EventForm, "Esc", "Cancel")),

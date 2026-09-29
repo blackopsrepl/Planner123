@@ -203,13 +203,13 @@ pub fn render_task_form(app: &App, frame: &mut Frame) {
     let rows = [
         format!("Title: {}", app.planner_task_title),
         format!("Duration minutes: {}", app.planner_task_duration),
-        format!("Target calendar: {calendar}  (type any key to cycle)"),
+        format!("Target calendar: {calendar}  (← / → to change)"),
         format!(
-            "Priority: {}  (type any key to cycle)",
+            "Priority: {}  (← / → to change)",
             priorities[app.planner_task_priority_index]
         ),
         format!(
-            "Cognitive load: {}  (type any key to cycle)",
+            "Cognitive load: {}  (← / → to change)",
             loads[app.planner_task_cognitive_index]
         ),
     ];
