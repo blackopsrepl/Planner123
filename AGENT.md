@@ -41,7 +41,8 @@ Direct cargo commands used in CI:
 - `src/planner.rs` and `src/planner/`: planner facade plus settings, tasks, availability, optimization, proposal lifecycle, evidence, and tests
 - `src/models.rs` and `src/models/`: stable data-model facade plus calendar, event, dependency, planning, and proposal types
 - `tests/cli.rs` and `tests/cli/`: binary-level CLI integration facade plus command-family test modules
-- `tests/keymap.rs` and `tests/help_overlay.rs`: keymap invariants (no key bound twice, every action reachable, documented keys really bound, status bar chips and budget) and help overlay order and size
+- `tests/keymap.rs`, `tests/help_overlay.rs`, `tests/destructive_actions.rs`: keymap invariants (no key bound twice, every action reachable, documented keys really bound, status bar chips and budget), help overlay order and size, and the confirmation gate on destructive actions
+- `tests/common/mod.rs`: the `App` harness those tests share (throwaway database, worker pump, one process-wide lock)
 - `docs/wireframes/`: ASCII references for the CLI and TUI surfaces
 - `docs/keymap-consolidation.md`: why the keymap looks the way it does, and what is still to consolidate
 

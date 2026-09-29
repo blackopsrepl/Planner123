@@ -1,13 +1,13 @@
 # Keymap consolidation — Planner123 ≤ v0.6.0 → target
 
-Status: **Phase 1 landed** (registry, status bar budget, generated help);
-phases 2–4 are open and listed in §8.
+Status: **phases 1–4 landed.** The keymap is consolidated; what remains open is
+listed in §0b.
 Scope: the interactive surface only (TUI keymap, status bar, help overlay, modal
 behaviour). The JSON CLI contract is untouched.
 
 ---
 
-## 0a. What Phase 1 shipped
+## 0a. What shipped
 
 Every commit green: `make lint && make test`.
 
@@ -16,6 +16,15 @@ Every commit green: `make lint && make test`.
 | `refactor(keys)` | `src/keys/registry` is the one table; `resolve` is a lookup over it; the status bar chips and the help overlay are derived from it; `src/keys/{navigation,forms,google,hints}.rs` are gone |
 | `fix(tui)` | the status bar has a width budget: the status block is capped at a third of the row, chips drop from the tail of a priority order, the help chip is reserved before anything else, quick add earns a chip |
 | `refactor(tui)` | the help overlay is generated per surface, opens on the surface you are in, and resets its scroll |
+| `test(tui)` | the help fit test derives the box height from `centered_rect` instead of hardcoding it |
+| `fix(tui)` | overlays return to the view they were opened from, not to the month grid |
+| `feat(tui)` | `:` opens a command palette (19 commands) over the actions that do not earn a key, and `g`'s dead binding becomes a real go-to-date prompt (`YYYY-MM-DD` or `+21` / `-7`) |
+| `refactor(keys)` | `g`, `i`, `x` and the duplicate bindings leave the flat namespace: `i` meant `.ics` import in one place and Google import in another, `s` meant sync in one place and planner settings in another |
+| `refactor(keys)` | one way to change a select value: `←`/`→` (aliased to `h`/`l`), no more `+`/`-`, no more "type any key to cycle" |
+| `feat(keys)` | `A` applies a planner proposal; the one bulk write to the calendar gets a deliberate keystroke |
+| `feat(tui)` | `d` and export arm first: the bar shows the question, `y` commits, any other key cancels, and nothing else is bound while it is up |
+| `fix(tui)` | the status message expires after six seconds instead of owning the right-hand block for the session |
+| `fix(tui)` | the project progress bars are gone: they read a completion set nothing ever wrote |
 
 Measured effect at 80 columns, month view:
 
@@ -24,18 +33,36 @@ Measured effect at 80 columns, month view:
  after  |  c create  e edit  d del  / quick  ? help      |  google off  14:22
 ```
 
-Tests that now hold the line: no key bound twice in a surface, the text wildcard
-never shadowing an explicit character, every `Action` reachable or listed as
-internal, every documented global key really bound, the bar chips per surface,
-the budget invariant at 80/100/120/160 columns, the help section order and fit,
-and every bar chip explained somewhere in help.
+End state: **167 registry rows, 195 key aliases, 79 bar chips, 79 help rows in
+14 sections**, all from one table. Per-surface keys: month 26 → 24, calendar
+sidebar 12 → 9, Google management 11 → 9. Three letters retired outright (`g`,
+`i`, `x`), `a` shifted to `A`, and `:` added; the long tail lives in the palette.
 
-Still open from §1.4: the dead `g` binding, the `i`/`s`/`n` overloads, `x`'s
-silent export, `d` without a confirmation, overlays returning to Month rather
-than to where they came from, and the never-expiring status message (its *width*
-is now bounded, its lifetime is not). Those are phase 2–3 work, as is one
-residual on a 24-row terminal: the current section plus GLOBAL is 22 rows
-against 18 visible, so the global keys still need a scroll.
+Two deliberate deviations from the proposal in §3–§7:
+
+- **The palette has 19 commands, not the ten sketched.** Views, today, new
+  event and quick add are in it too: a command palette that hides half the app
+  is a worse index than a slightly longer one.
+- **The sidebar Projects panel was not cut.** The bars and the `0/N` fraction
+  were the lie — the state behind them (`completed_event_ids`) had no writer —
+  so the panel now shows the project and its event count in the loaded window,
+  and the field and the progress-bar helper are gone.
+
+## 0b. Still open
+
+- On an 80 column terminal the palette chip and the view switcher are the first
+  chips to drop (the verbs and `?` stay). The palette is documented in the
+  global section of help, but it is not on the bar at that width.
+- Help scrolls one section at a time, current surface first; it has no
+  type-to-filter of its own. The palette covers the action long tail, not the
+  help text.
+- The right-hand status zone still holds one message; there is no queue, so a
+  worker result and a validation error overwrite each other (both expire now).
+- The `p` planner key is lowercase while the other surface switches (`Tab`,
+  digits) are structural: §4.3 documents it as an exception rather than fixing
+  it.
+- The planner task form's timing fields (earliest start, deadline) remain
+  CLI-only; the TUI form collects title, duration, calendar, priority and load.
 
 ## 0. The decision in one paragraph
 
