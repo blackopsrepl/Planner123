@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.2](https://github.com/blackopsrepl/Planner123/compare/v0.6.1...v0.6.2) (2026-09-29)
+
+
+### Features
+
+* **tui:** build the help overlay from the keymap registry 2a9f7c2
+
 ## [0.6.1](https://github.com/blackopsrepl/Planner123/compare/v0.6.0...v0.6.1) (2026-09-29)
 
 

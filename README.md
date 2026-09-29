@@ -7,7 +7,7 @@
   <br />
 
   [![CI](https://github.com/blackopsrepl/Planner123/actions/workflows/ci.yml/badge.svg?style=for-the-badge)](https://github.com/blackopsrepl/Planner123/actions/workflows/ci.yml)
-  [![Version](https://img.shields.io/badge/version-v0.6.1-00E6A8?style=for-the-badge)](https://github.com/blackopsrepl/Planner123)
+  [![Version](https://img.shields.io/badge/version-v0.6.2-00E6A8?style=for-the-badge)](https://github.com/blackopsrepl/Planner123)
   [![Rust](https://img.shields.io/badge/rust-stable-orange?style=for-the-badge)](https://www.rust-lang.org)
   [![Built With Ratatui](https://img.shields.io/badge/built%20with-ratatui-5A54FF?style=for-the-badge)](https://ratatui.rs/)
 
