@@ -1,4 +1,45 @@
 use super::*;
+
+/* Fields of the planner task form: title, duration, calendar, priority,
+cognitive load, earliest start, deadline kind, deadline. The form's movement
+keys and its rendering both read this. */
+pub const TASK_FORM_FIELDS: usize = 8;
+
+pub const DEADLINE_KINDS: [DeadlineKind; 3] =
+    [DeadlineKind::None, DeadlineKind::Soft, DeadlineKind::Hard];
+
+/* Which end of a day a bare date means. */
+pub enum DayEdge {
+    Start,
+    End,
+}
+
+/* The planner stores timestamps as "YYYY-MM-DD HH:MM:SS". The form accepts the
+friendlier "YYYY-MM-DD HH:MM" and a bare date, which reads as the start of the
+day for an earliest start and the end of the day for a deadline. */
+pub fn parse_timestamp_input(input: &str, edge: DayEdge) -> Result<String, String> {
+    let input = input.trim();
+    if input.is_empty() {
+        return Err("A date is required. Use YYYY-MM-DD or YYYY-MM-DD HH:MM.".into());
+    }
+    if NaiveDateTime::parse_from_str(input, "%Y-%m-%d %H:%M:%S").is_ok() {
+        return Ok(input.to_string());
+    }
+    if NaiveDateTime::parse_from_str(input, "%Y-%m-%d %H:%M").is_ok() {
+        return Ok(format!("{input}:00"));
+    }
+    if NaiveDate::parse_from_str(input, "%Y-%m-%d").is_ok() {
+        let time = match edge {
+            DayEdge::Start => "00:00:00",
+            DayEdge::End => "23:59:00",
+        };
+        return Ok(format!("{input} {time}"));
+    }
+    Err(format!(
+        "\u{201c}{input}\u{201d} is not a date. Use YYYY-MM-DD or YYYY-MM-DD HH:MM."
+    ))
+}
+
 impl App {
     pub(super) fn open_planner_task_form(&mut self) {
         self.planner_task_field = 0;
@@ -7,15 +48,21 @@ impl App {
         self.planner_task_calendar_index = 0;
         self.planner_task_priority_index = 1;
         self.planner_task_cognitive_index = 1;
+        self.planner_task_earliest.clear();
+        self.planner_task_deadline_kind_index = 0;
+        self.planner_task_deadline.clear();
         self.view = View::PlannerTaskForm;
     }
 
     pub(super) fn planner_task_next_field(&mut self) {
-        self.planner_task_field = (self.planner_task_field + 1) % 5;
+        self.planner_task_field = (self.planner_task_field + 1) % TASK_FORM_FIELDS;
     }
 
     pub(super) fn planner_task_prev_field(&mut self) {
-        self.planner_task_field = self.planner_task_field.checked_sub(1).unwrap_or(4);
+        self.planner_task_field = self
+            .planner_task_field
+            .checked_sub(1)
+            .unwrap_or(TASK_FORM_FIELDS - 1);
     }
 
     /* Text fields take characters; select fields cycle with h / l (and the
@@ -46,6 +93,17 @@ impl App {
             4 if c == 'h' => {
                 self.planner_task_cognitive_index = (self.planner_task_cognitive_index + 2) % 3
             }
+            5 => self.planner_task_earliest.push(c),
+            6 if c == 'l' => {
+                self.planner_task_deadline_kind_index =
+                    (self.planner_task_deadline_kind_index + 1) % DEADLINE_KINDS.len()
+            }
+            6 if c == 'h' => {
+                self.planner_task_deadline_kind_index =
+                    (self.planner_task_deadline_kind_index + DEADLINE_KINDS.len() - 1)
+                        % DEADLINE_KINDS.len()
+            }
+            7 => self.planner_task_deadline.push(c),
             _ => {}
         }
     }
@@ -57,6 +115,12 @@ impl App {
             }
             1 => {
                 self.planner_task_duration.pop();
+            }
+            5 => {
+                self.planner_task_earliest.pop();
+            }
+            7 => {
+                self.planner_task_deadline.pop();
             }
             _ => {}
         }
@@ -74,6 +138,40 @@ impl App {
                 return;
             }
         };
+        let earliest_at = match self.planner_task_earliest.trim() {
+            "" => None,
+            value => match parse_timestamp_input(value, DayEdge::Start) {
+                Ok(timestamp) => Some(timestamp),
+                Err(message) => {
+                    self.set_status(format!("Earliest start: {message}"), true);
+                    return;
+                }
+            },
+        };
+
+        let deadline_kind = DEADLINE_KINDS[self.planner_task_deadline_kind_index].clone();
+        let deadline_at = match (&deadline_kind, self.planner_task_deadline.trim()) {
+            (DeadlineKind::None, "") => None,
+            (DeadlineKind::None, _) => {
+                self.set_status(
+                    "A deadline needs its kind set to soft or hard (cycle the field with h / l).",
+                    true,
+                );
+                return;
+            }
+            (_, "") => {
+                self.set_status("A soft or hard deadline needs a date.", true);
+                return;
+            }
+            (_, value) => match parse_timestamp_input(value, DayEdge::End) {
+                Ok(timestamp) => Some(timestamp),
+                Err(message) => {
+                    self.set_status(format!("Deadline: {message}"), true);
+                    return;
+                }
+            },
+        };
+
         let priority = [TaskPriority::Low, TaskPriority::Normal, TaskPriority::High]
             [self.planner_task_priority_index]
             .clone();
@@ -92,9 +190,9 @@ impl App {
                 project_id: None,
                 priority,
                 cognitive_load,
-                earliest_at: None,
-                deadline_kind: crate::models::DeadlineKind::None,
-                deadline_at: None,
+                earliest_at,
+                deadline_kind,
+                deadline_at,
             });
         self.view = View::PlannerInbox;
     }

@@ -1,6 +1,7 @@
 use chrono::NaiveDate;
 
 use super::palette::{commands, parse_date_input};
+use super::planner::{parse_timestamp_input, DayEdge, TASK_FORM_FIELDS};
 use super::query::{status_is_stale, STATUS_TICKS};
 use super::utilities::google_sync_finished_status;
 use crate::keys::fuzzy_match;
@@ -72,4 +73,36 @@ fn a_status_message_expires_after_its_ticks() {
     assert!(!status_is_stale(10, 10 + STATUS_TICKS - 1));
     assert!(status_is_stale(10, 10 + STATUS_TICKS));
     assert!(status_is_stale(10, 10_000));
+}
+
+#[test]
+fn planner_timestamps_accept_the_formats_the_form_advertises() {
+    assert_eq!(
+        parse_timestamp_input("2026-10-15 09:30", DayEdge::Start).unwrap(),
+        "2026-10-15 09:30:00"
+    );
+    assert_eq!(
+        parse_timestamp_input("2026-10-15 09:30:45", DayEdge::Start).unwrap(),
+        "2026-10-15 09:30:45"
+    );
+    // A bare date reads as the start of the day for an earliest start...
+    assert_eq!(
+        parse_timestamp_input("2026-10-15", DayEdge::Start).unwrap(),
+        "2026-10-15 00:00:00"
+    );
+    // ...and the end of it for a deadline.
+    assert_eq!(
+        parse_timestamp_input("2026-10-15", DayEdge::End).unwrap(),
+        "2026-10-15 23:59:00"
+    );
+
+    assert!(parse_timestamp_input("", DayEdge::Start).is_err());
+    assert!(parse_timestamp_input("friday", DayEdge::Start).is_err());
+    assert!(parse_timestamp_input("2026-13-01", DayEdge::End).is_err());
+}
+
+/* The form's movement keys wrap over the fields the form renders. */
+#[test]
+fn the_task_form_wraps_over_every_field() {
+    assert_eq!(TASK_FORM_FIELDS, 8);
 }

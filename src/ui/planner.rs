@@ -191,7 +191,7 @@ pub fn render_settings_form(app: &App, frame: &mut Frame) {
 }
 
 pub fn render_task_form(app: &App, frame: &mut Frame) {
-    let area = centered_rect(60, 46, frame.area());
+    let area = centered_rect(60, 56, frame.area());
     frame.render_widget(Clear, area);
     let calendar = app
         .calendars
@@ -200,6 +200,7 @@ pub fn render_task_form(app: &App, frame: &mut Frame) {
         .unwrap_or("none");
     let priorities = ["low", "normal", "high"];
     let loads = ["low", "medium", "high"];
+    let deadlines = ["none", "soft", "hard"];
     let rows = [
         format!("Title: {}", app.planner_task_title),
         format!("Duration minutes: {}", app.planner_task_duration),
@@ -212,6 +213,12 @@ pub fn render_task_form(app: &App, frame: &mut Frame) {
             "Cognitive load: {}  (← / → to change)",
             loads[app.planner_task_cognitive_index]
         ),
+        format!("Earliest start: {}", app.planner_task_earliest),
+        format!(
+            "Deadline kind: {}  (← / → to change)",
+            deadlines[app.planner_task_deadline_kind_index]
+        ),
+        format!("Deadline: {}", app.planner_task_deadline),
     ];
     let lines = rows
         .into_iter()
@@ -232,6 +239,16 @@ pub fn render_task_form(app: &App, frame: &mut Frame) {
             ))
         })
         .collect::<Vec<_>>();
+    let mut lines = lines;
+    lines.extend([
+        Line::from(""),
+        Line::from("Dates: YYYY-MM-DD or YYYY-MM-DD HH:MM."),
+        Line::from(
+            "A bare date means the start of that day for an earliest start, the end of it for a deadline.",
+        ),
+        Line::from("A deadline needs its kind set to soft or hard."),
+    ]);
+
     frame.render_widget(
         Paragraph::new(lines).block(
             Block::default()

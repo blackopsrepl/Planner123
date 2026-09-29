@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::{Datelike, Duration, Local, NaiveDate};
+use chrono::{Datelike, Duration, Local, NaiveDate, NaiveDateTime};
 use tokio::sync::RwLock;
 
 use crate::dag::EventDag;
 use crate::google::discovery::DiscoveredGoogleCalendar;
 use crate::keys::{Action, View};
 use crate::models::{Calendar, Event, EventDependency, Project};
-use crate::models::{CognitiveLoad, PlanningTask, TaskPriority};
+use crate::models::{CognitiveLoad, DeadlineKind, PlanningTask, TaskPriority};
 use crate::sync::state::CalendarSyncState;
 use crate::worker::{Worker, WorkerResult};
 
