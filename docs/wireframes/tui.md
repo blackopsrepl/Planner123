@@ -29,13 +29,18 @@
 
 ## Interaction notes
 
+- `:` opens the command palette: the actions that do not earn a key of their own
+  (`.ics` import and export, Google connection and discovery, planner settings,
+  go to date), filtered by typing.
 - `G` opens Google management or the auth surface if no account is configured.
 - `S` triggers sync immediately; there is no automatic startup sync.
+- The status bar shows the verbs for the current surface and drops trailing
+  chips on a narrow terminal, so `? help` is always visible.
 - Read-only Google calendars stay visible but reject local edits.
 - Google conflicts are surfaced in the status bar and Google management view.
-- `.ics` import is explicit through `i` and targets the selected calendar.
+- `.ics` import is explicit (palette: "Import .ics file") and targets the selected calendar.
 # Planner Inbox
 
-`p` opens a dedicated planner surface; it does not alter event quick-add or event forms. The task list contains only unscheduled inbox work: tasks leave it when their proposal is applied, while their durable lifecycle record remains available through the JSON CLI. Use `j`/`k` to inspect the selected task's calendar, priority, cognitive load, timing constraints, and identifier. `n` opens a task form with title, duration, target calendar, priority, and cognitive load. `s` opens Planner Settings for timezone, weekly availability, horizon, slot size, and solve time. The timezone field explicitly requires an IANA name such as `Europe/Rome` or `UTC`, shows the detected system timezone, and validates before save. Availability explicitly uses comma-separated `day=HH:MM-HH:MM` entries, for `mon` through `sun` or full weekday names, with a working-week example and split-shift support. `o` opens settings instead of running if the persisted timezone or weekly availability is absent or invalid; otherwise it runs the batch optimizer and displays a proposal with timing and fatigue explanations. `a` applies the reviewed proposal explicitly.
+`p` opens a dedicated planner surface; it does not alter event quick-add or event forms. The task list contains only unscheduled inbox work: tasks leave it when their proposal is applied, while their durable lifecycle record remains available through the JSON CLI. Use `j`/`k` to inspect the selected task's calendar, priority, cognitive load, timing constraints, and identifier. `n` opens a task form with title, duration, target calendar, priority, and cognitive load. `s` opens Planner Settings for timezone, weekly availability, horizon, slot size, and solve time. The timezone field explicitly requires an IANA name such as `Europe/Rome` or `UTC`, shows the detected system timezone, and validates before save. Availability explicitly uses comma-separated `day=HH:MM-HH:MM` entries, for `mon` through `sun` or full weekday names, with a working-week example and split-shift support. `o` opens settings instead of running if the persisted timezone or weekly availability is absent or invalid; otherwise it runs the batch optimizer and displays a proposal with timing and fatigue explanations. `A` applies the reviewed proposal explicitly; it is shifted on purpose, because it is the one action that writes events in bulk.
 
 The TUI and JSON CLI share one persisted planner setting source. Weekly availability uses visual TUI editing or repeatable typed CLI values such as `--availability mon=09:00-17:00`.

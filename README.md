@@ -37,7 +37,8 @@ cargo build --release
 That's it — the app creates its database on first launch at
 `~/.local/share/planner123/calendar.db` and starts with a fresh calendar.
 Press `?` inside the app for the keybinding cheat sheet, or `p` to meet the
-planner.
+planner. Press `:` for the command palette — every action without a key of its
+own, searchable by typing ("gcal", "exp", "date").
 
 If you prefer not to build from source, every feature is also reachable
 through a non-interactive CLI (see [Automating and scripting](#automating-and-scripting)).
@@ -65,6 +66,11 @@ Press `1`–`4` to switch views:
   reminder that fires as a desktop notification, and can belong to a project.
 - Calendars are color-coded and can be toggled on/off in the sidebar with
   `Tab` + `Space`, so you can focus on work, personal, or anything else.
+
+The status bar shows the verbs for whatever you are looking at (create, edit,
+delete, quick add) and adds more as the terminal allows; `? help` is always on
+it. Window and date navigation lives in the cheat sheet, which opens on the
+keys for the view you are in.
 
 Press `?` any time for the built-in cheat sheet:
 

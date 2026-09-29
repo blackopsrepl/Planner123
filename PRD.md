@@ -168,7 +168,10 @@ This release is successful if the product feels like one coherent system instead
 ### 10.1 Product truth and cleanup
 
 - Remove or correct any user-facing claims that are currently ahead of implementation before merging partial work.
-- Align README keybindings with the real keymap.
+- ~~Align README keybindings with the real keymap.~~ Done: the keymap lives in
+  `src/keys/registry`, which also generates the status bar chips and the help
+  overlay, so the README, help text and resolver cannot disagree
+  (`tests/keymap.rs`, `tests/help_overlay.rs`).
 - Align help text, README, and actual `.ics` behavior.
 - Align "two-way sync" wording with the real shipped scope.
 
@@ -290,8 +293,11 @@ The TUI must remain fast, legible, and quiet under error.
 Requirements:
 
 - `G` opens Google management or connection.
-- `S` triggers sync now.
-- Status bar shows connection state, sync progress, and errors without overwhelming the main view.
+- `S` triggers sync now, in every surface, with one meaning.
+- `:` opens the command palette for the actions that do not earn a key.
+- Status bar shows connection state, sync progress, and errors without overwhelming the main view. It is width-budgeted: the status block takes at most a
+  third of the row and the key chips drop from the tail rather than being
+  clipped, with `? help` reserved first.
 - Imported read-only calendars show a lock or equivalent clear state.
 - Sync conflicts and per-calendar failures are visible.
 - Event forms on Google calendars must communicate whether edits will sync.
@@ -579,7 +585,8 @@ Implement in the following order. Do not jump ahead if a lower layer is still st
 ### Phase 0: Truth alignment and foundation cleanup
 
 - Fix README, help text, and wireframes that currently over-claim behavior.
-- correct quick-add keybinding docs.
+- ~~correct quick-add keybinding docs.~~ Done: README and the help overlay both
+  document `/` as quick-add and Enter as create; the help overlay is generated.
 - add this PRD to repo documentation references if appropriate.
 - introduce shared event service and move duplicated mutation rules out of TUI and CLI.
 
