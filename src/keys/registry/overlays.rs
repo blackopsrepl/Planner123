@@ -13,6 +13,7 @@ bound in some surface. */
 pub static GLOBAL: &[Binding] = &[
     b!(Global, [Char('q'), Ctrl('c')], A::Quit, None, help!(S::Global, "q / Ctrl+C", "Quit")),
     b!(Global, [Char('?')], A::Help, None, help!(S::Global, "?", "Toggle this help")),
+    b!(Global, [Char(':')], A::Palette, None, help!(S::Global, ":", "Open the command palette")),
     b!(Global, [Char('1')], A::ViewMonth, None, help!(S::Global, "1", "Month view")),
     b!(Global, [Char('2')], A::ViewWeek, None, help!(S::Global, "2", "Week view")),
     b!(Global, [Char('3')], A::ViewDay, None, help!(S::Global, "3", "Day view")),
@@ -31,6 +32,7 @@ pub static CALENDAR_LIST: &[Binding] = &[
     b!(CalendarList, [Char('j'), Down], A::CalendarDown, None, None),
     b!(CalendarList, [Space], A::ToggleCalendar, bar!("Space", "toggle"), help!(S::CalendarList, "Space", "Toggle calendar visibility")),
     b!(CalendarList, [Tab, Esc], A::FocusMain, bar!("Tab", "main"), help!(S::CalendarList, "Tab / Esc", "Return to main view")),
+    b!(CalendarList, [Char(':')], A::Palette, bar!(":", "cmd"), help!(S::Global, ":", "Open the command palette")),
     b!(pin CalendarList, [Char('?')], A::Help, bar!("?", "help"), help!(S::Global, "?", "Toggle this help")),
     b!(CalendarList, [Char('c')], A::CreateEvent, None, None),
     b!(CalendarList, [Char('q')], A::Quit, None, None),
@@ -66,6 +68,26 @@ pub static ICAL_IMPORT: &[Binding] = &[
     b!(IcalImport, [Esc], A::FormCancel, bar!("Esc", "cancel"), help!(S::IcalImport, "Esc", "Cancel")),
     b!(IcalImport, [AnyChar], TEXT_INPUT, None, None),
     b!(IcalImport, [Backspace], A::InputBackspace, None, None),
+];
+
+/* Command palette: a typed filter over the actions that do not earn a key. */
+#[rustfmt::skip]
+pub static PALETTE: &[Binding] = &[
+    b!(Palette, [Up], A::PaletteUp, bar!("↑/↓", "move"), help!(S::Palette, "↑ / ↓", "Move through matches")),
+    b!(Palette, [Down], A::PaletteDown, None, None),
+    b!(Palette, [Enter], A::PaletteRun, bar!("Enter", "run"), help!(S::Palette, "Enter", "Run the selected command")),
+    b!(Palette, [Esc], A::Escape, bar!("Esc", "close"), help!(S::Palette, "Esc", "Close the palette")),
+    b!(Palette, [AnyChar], TEXT_INPUT, None, help!(S::Palette, "Type", "Filter commands")),
+    b!(Palette, [Backspace], A::InputBackspace, None, None),
+];
+
+/* Go to date prompt: an absolute date or an offset in days. */
+#[rustfmt::skip]
+pub static DATE_JUMP: &[Binding] = &[
+    b!(DateJump, [Enter], A::InputSubmit, bar!("Enter", "go"), help!(S::DateJump, "Enter", "Jump to the date")),
+    b!(DateJump, [Esc], A::InputCancel, bar!("Esc", "cancel"), help!(S::DateJump, "Esc", "Cancel")),
+    b!(DateJump, [AnyChar], TEXT_INPUT, None, help!(S::DateJump, "Type", "YYYY-MM-DD, or +21 / -7 for days from today")),
+    b!(DateJump, [Backspace], A::InputBackspace, None, None),
 ];
 
 /* Quick add bar: type a title, Enter creates it on the focused date. */

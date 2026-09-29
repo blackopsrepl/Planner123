@@ -11,6 +11,8 @@ pub enum View {
     EventForm,
     IcalImport,
     QuickAdd,
+    Palette,
+    DateJump,
     Help,
     GoogleManage,
     GoogleAuth,
@@ -67,6 +69,12 @@ pub enum Action {
     InputBackspace,
     InputSubmit,
     InputCancel,
+
+    // ── Command palette ──────────────────────────────────────────
+    Palette,     // : = open the palette
+    PaletteRun,  // Enter = run the selected command
+    PaletteUp,   // ↑
+    PaletteDown, // ↓
 
     // ── Google Calendar ──────────────────────────────────────────
     GoogleManage,

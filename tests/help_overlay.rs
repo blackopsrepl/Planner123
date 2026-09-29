@@ -28,6 +28,8 @@ fn every_view() -> Vec<View> {
         View::EventForm,
         View::IcalImport,
         View::QuickAdd,
+        View::Palette,
+        View::DateJump,
         View::Help,
         View::GoogleManage,
         View::GoogleAuth,

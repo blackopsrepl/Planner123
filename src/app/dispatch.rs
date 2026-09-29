@@ -2,6 +2,12 @@ use super::*;
 impl App {
     pub fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
         let action = crate::keys::resolve(&self.view, key);
+        self.handle_key_action(action);
+    }
+
+    /* Split out so the palette can run a command through the same path a key
+    takes, without going back through the resolver. */
+    fn handle_key_action(&mut self, action: Action) {
         self.dispatch(action);
     }
 
@@ -88,7 +94,11 @@ impl App {
             },
             Action::FormCancel => self.handle_escape(),
             Action::InputChar(c) => {
-                if self.view == View::PlannerTaskForm {
+                if self.view == View::Palette {
+                    self.palette_input_char(c)
+                } else if self.view == View::DateJump {
+                    self.date_jump_char(c)
+                } else if self.view == View::PlannerTaskForm {
                     self.planner_task_input_char(c)
                 } else if self.view == View::PlannerSettingsForm {
                     self.planner_settings_input_char(c)
@@ -97,7 +107,11 @@ impl App {
                 }
             }
             Action::InputBackspace => {
-                if self.view == View::PlannerTaskForm {
+                if self.view == View::Palette {
+                    self.palette_input_backspace()
+                } else if self.view == View::DateJump {
+                    self.date_jump_backspace()
+                } else if self.view == View::PlannerTaskForm {
                     self.planner_task_input_backspace()
                 } else if self.view == View::PlannerSettingsForm {
                     self.planner_settings_input_backspace()
@@ -134,6 +148,12 @@ impl App {
             Action::ScrollDown => self.scroll_down(),
             Action::ScrollPageUp => self.scroll_page(-10),
             Action::ScrollPageDown => self.scroll_page(10),
+
+            // Command palette
+            Action::Palette => self.open_palette(),
+            Action::PaletteRun => self.palette_run(),
+            Action::PaletteUp => self.palette_up(),
+            Action::PaletteDown => self.palette_down(),
 
             // Quick add
             Action::QuickAdd => {
@@ -178,7 +198,9 @@ impl App {
             }
             Action::PlannerSettings => self.open_planner_settings_form(),
 
-            Action::None | Action::JumpToDate => {}
+            Action::JumpToDate => self.open_date_jump(),
+
+            Action::None => {}
         }
     }
 

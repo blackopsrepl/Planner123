@@ -23,6 +23,7 @@ pub mod google_manage;
 pub mod help;
 pub mod ical_import;
 pub mod month_view;
+pub mod palette;
 pub mod planner;
 pub mod quick_add;
 pub mod status_bar;
@@ -82,7 +83,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         View::QuickAdd => {
             month_view::render_month(app, frame, content_area);
         }
-        View::Help => {
+        View::Help | View::Palette | View::DateJump => {
             month_view::render_month(app, frame, content_area);
         }
         View::GoogleAuth => {
@@ -99,6 +100,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     // ── Status / bottom bar ──────────────────────────────────────
     match &app.view {
         View::QuickAdd => quick_add::render_quick_add(app, frame, status_area),
+        View::DateJump => palette::render_date_prompt(app, frame, status_area),
         _ => status_bar::render_status_bar(app, frame, status_area),
     }
 
@@ -106,6 +108,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     match &app.view {
         View::EventForm => event_form::render_event_form(app, frame),
         View::Help => help::render_help(app, frame),
+        View::Palette => palette::render_palette(app, frame),
         View::GoogleManage => google_manage::render_google_manage(app, frame),
         View::GoogleAuth => google_auth::render_google_auth(app, frame),
         View::IcalImport => ical_import::render_ical_import(app, frame),

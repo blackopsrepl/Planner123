@@ -264,6 +264,7 @@ impl App {
                 }
             }
             View::IcalImport => self.ical_import_submit(),
+            View::DateJump => self.date_jump_submit(),
             _ => {}
         }
     }

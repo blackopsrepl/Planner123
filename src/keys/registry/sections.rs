@@ -19,6 +19,8 @@ pub enum Section {
     CalendarList,
     EventForm,
     QuickAdd,
+    Palette,
+    DateJump,
     IcalImport,
     GoogleManage,
     Planner,
@@ -36,6 +38,8 @@ impl Section {
             Section::CalendarList => "CALENDAR SIDEBAR (Tab)",
             Section::EventForm => "EVENT FORM",
             Section::QuickAdd => "QUICK-ADD BAR",
+            Section::Palette => "COMMAND PALETTE",
+            Section::DateJump => "GO TO DATE",
             Section::IcalImport => "ICAL IMPORT",
             Section::GoogleManage => "GOOGLE MANAGEMENT",
             Section::Planner => "PLANNER",
@@ -45,7 +49,7 @@ impl Section {
 }
 
 /* Section reading order when nothing is current. */
-const ORDER: [Section; 12] = [
+const ORDER: [Section; 14] = [
     Section::Global,
     Section::Month,
     Section::Week,
@@ -54,6 +58,8 @@ const ORDER: [Section; 12] = [
     Section::CalendarList,
     Section::EventForm,
     Section::QuickAdd,
+    Section::Palette,
+    Section::DateJump,
     Section::IcalImport,
     Section::GoogleManage,
     Section::Planner,
@@ -78,6 +84,8 @@ pub fn section_for_context(context: Context) -> Option<Section> {
         }
         Context::IcalImport => Some(Section::IcalImport),
         Context::QuickAdd => Some(Section::QuickAdd),
+        Context::Palette => Some(Section::Palette),
+        Context::DateJump => Some(Section::DateJump),
         Context::Help => Some(Section::Help),
         Context::GoogleManage => Some(Section::GoogleManage),
         Context::GoogleAuth => None,

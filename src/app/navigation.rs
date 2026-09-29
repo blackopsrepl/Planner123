@@ -204,6 +204,8 @@ impl App {
             | View::EventForm
             | View::IcalImport
             | View::QuickAdd
+            | View::Palette
+            | View::DateJump
             | View::GoogleAuth
             | View::GoogleManage
             | View::CalendarList

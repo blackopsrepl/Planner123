@@ -137,6 +137,11 @@ pub struct App {
     // ── Quick-add bar ─────────────────────────────────────────────
     pub quick_add_input: String,
 
+    // ── Command palette + go to date ──────────────────────────────
+    pub palette_input: String,
+    pub palette_index: usize,
+    pub date_jump_input: String,
+
     // ── Agenda scroll ─────────────────────────────────────────────
     pub agenda_scroll: u16,
 
@@ -226,6 +231,9 @@ impl App {
             ical_import_calendar_index: 0,
             ical_import_field_index: 0,
             quick_add_input: String::new(),
+            palette_input: String::new(),
+            palette_index: 0,
+            date_jump_input: String::new(),
             agenda_scroll: 0,
             help_scroll: 0,
             google_auth_client_id: String::new(),

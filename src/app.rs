@@ -16,6 +16,7 @@ mod dispatch;
 mod event_form;
 mod integrations;
 mod navigation;
+mod palette;
 mod planner;
 mod query;
 mod state;

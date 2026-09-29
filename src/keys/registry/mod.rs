@@ -26,8 +26,8 @@ pub use sections::{help_sections, section_of, Section};
 
 use calendar::{AGENDA, DAY, MONTH, WEEK};
 use overlays::{
-    CALENDAR_LIST, EVENT_FORM, GLOBAL, GOOGLE_AUTH, GOOGLE_MANAGE, HELP, ICAL_IMPORT,
-    PLANNER_INBOX, QUICK_ADD,
+    CALENDAR_LIST, DATE_JUMP, EVENT_FORM, GLOBAL, GOOGLE_AUTH, GOOGLE_MANAGE, HELP, ICAL_IMPORT,
+    PALETTE, PLANNER_INBOX, QUICK_ADD,
 };
 
 /* The surface a binding belongs to.
@@ -48,6 +48,8 @@ pub enum Context {
     EventForm,
     IcalImport,
     QuickAdd,
+    Palette,
+    DateJump,
     Help,
     GoogleManage,
     GoogleAuth,
@@ -68,6 +70,8 @@ impl Context {
             View::EventForm => Context::EventForm,
             View::IcalImport => Context::IcalImport,
             View::QuickAdd => Context::QuickAdd,
+            View::Palette => Context::Palette,
+            View::DateJump => Context::DateJump,
             View::Help => Context::Help,
             View::GoogleManage => Context::GoogleManage,
             View::GoogleAuth => Context::GoogleAuth,
@@ -172,6 +176,8 @@ pub fn rows(context: Context) -> &'static [Binding] {
         Context::EventForm | Context::PlannerTaskForm | Context::PlannerSettingsForm => EVENT_FORM,
         Context::IcalImport => ICAL_IMPORT,
         Context::QuickAdd => QUICK_ADD,
+        Context::Palette => PALETTE,
+        Context::DateJump => DATE_JUMP,
         Context::Help => HELP,
         Context::GoogleManage => GOOGLE_MANAGE,
         Context::GoogleAuth => GOOGLE_AUTH,
@@ -191,6 +197,8 @@ pub fn tables() -> Vec<&'static [Binding]> {
         EVENT_FORM,
         ICAL_IMPORT,
         QUICK_ADD,
+        PALETTE,
+        DATE_JUMP,
         HELP,
         GOOGLE_MANAGE,
         GOOGLE_AUTH,
@@ -209,6 +217,8 @@ pub fn contexts() -> Vec<Context> {
         Context::EventForm,
         Context::IcalImport,
         Context::QuickAdd,
+        Context::Palette,
+        Context::DateJump,
         Context::Help,
         Context::GoogleManage,
         Context::GoogleAuth,
