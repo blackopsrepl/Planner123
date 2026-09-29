@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.5](https://github.com/blackopsrepl/Planner123/compare/v0.6.4...v0.6.5) (2026-09-29)
+
+
+### Features
+
+* **tui:** filter the help overlay by typing, and open it on the right section 5ea8dcf
+* **tui:** set a planner task's timing in the form d2a7484
+
 ## [0.6.4](https://github.com/blackopsrepl/Planner123/compare/v0.6.3...v0.6.4) (2026-09-29)
 
 
