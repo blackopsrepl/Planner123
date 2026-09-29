@@ -250,9 +250,11 @@ impl App {
                 if !input.is_empty() {
                     self.parse_and_create_event(&input);
                 }
-                // Quick-add can be opened from day/week view; entering the month
-                // grid must re-anchor and load it rather than render a stale month.
-                self.switch_view(View::Month);
+                // Quick-add can be opened from any calendar view; returning goes
+                // through `switch_view` so the target view re-anchors and loads
+                // its range instead of rendering a stale one.
+                let return_view = self.return_view.clone();
+                self.switch_view(return_view);
             }
             View::GoogleAuth => {
                 if self.google_auth_field == 0 {

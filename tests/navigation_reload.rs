@@ -223,7 +223,47 @@ fn navigation_requests_window_covering_the_focused_month() {
 }
 
 #[test]
-fn escaping_an_overlay_after_day_navigation_shows_the_focused_month() {
+fn escaping_an_overlay_returns_to_the_view_it_was_opened_from() {
+    let _serial = serial_guard();
+    let dir = TempDir::new().unwrap();
+    let target = offset_month_date(2);
+    let (rt, mut app) = seeded_app(
+        &dir,
+        &[(
+            &format!("{} 09:00:00", target),
+            &format!("{} 10:00:00", target),
+        )],
+    );
+
+    // Day view: step one day at a time so every load narrows the window to a
+    // single date, and the display month stops following the cursor.
+    app.dispatch(Action::ViewDay);
+    while app.focused_date != target {
+        app.dispatch(Action::NextPeriod);
+    }
+    assert!(
+        pump_until(&mut app, &rt, Duration::from_secs(5), |app| app
+            .event_window
+            == Some((target, target))
+            && !app.loading),
+        "day navigation must settle on a single-day window"
+    );
+
+    // An overlay opened from the day view closes back into the day view: the
+    // cursor must not be thrown into the month grid.
+    app.dispatch(Action::Help);
+    app.dispatch(Action::Escape);
+
+    assert_eq!(app.view, View::Day);
+    assert_eq!(
+        app.event_window,
+        Some((target, target)),
+        "returning must keep the day view's loaded range"
+    );
+}
+
+#[test]
+fn returning_to_the_month_view_from_an_overlay_loads_the_focused_month() {
     let _serial = serial_guard();
     let dir = TempDir::new().unwrap();
     let target = offset_month_date(2);
@@ -245,22 +285,15 @@ fn escaping_an_overlay_after_day_navigation_shows_the_focused_month() {
         ],
     );
 
-    // Day view: step one day at a time so every load narrows the window to a
-    // single date, and the display month stops following the cursor.
     app.dispatch(Action::ViewDay);
     while app.focused_date != target {
         app.dispatch(Action::NextPeriod);
     }
-    assert!(
-        pump_until(&mut app, &rt, Duration::from_secs(5), |app| app
-            .event_window
-            == Some((target, target))
-            && !app.loading),
-        "day navigation must settle on a single-day window"
-    );
 
-    // Open an overlay and back out of it: returning to the month view must
-    // re-anchor the grid to the focused date and load that month.
+    // Back to the month grid, then an overlay round trip: the grid must show
+    // the focused month with that month's events loaded, not the day window the
+    // cursor walked out on.
+    app.dispatch(Action::ViewMonth);
     app.dispatch(Action::Help);
     app.dispatch(Action::Escape);
 
@@ -270,6 +303,6 @@ fn escaping_an_overlay_after_day_navigation_shows_the_focused_month() {
             == target_month
             && app.view_year == target_year
             && !app.events_on_date(other_day).is_empty()),
-        "escaping to the month view must re-anchor to the focused month and load it"
+        "the month grid must re-anchor to the focused month and load it"
     );
 }

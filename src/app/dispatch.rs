@@ -34,10 +34,11 @@ impl App {
                 self.view = View::CalendarList;
             }
             Action::FocusMain => {
-                // Return to the month grid through the reload path: the focused
-                // date may sit outside the displayed month's grid (the sidebar
-                // can be reached from a drifted week/day view).
-                self.switch_view(View::Month);
+                // Leave the sidebar and return to the calendar view it was
+                // opened from (the focused date may sit outside the displayed
+                // month's grid, so this goes through the reload path).
+                let return_view = self.return_view.clone();
+                self.switch_view(return_view);
             }
 
             // Time navigation

@@ -138,7 +138,8 @@ impl App {
             Ok(_) => {
                 self.google_client = None;
                 self.google_discovered_calendars.clear();
-                self.switch_view(View::Month);
+                let return_view = self.return_view.clone();
+                self.switch_view(return_view);
                 self.set_status("Google disconnected.", false);
             }
             Err(err) => self.set_status(format!("Google logout failed: {}", err), true),
@@ -206,7 +207,7 @@ impl App {
     pub(super) fn select_event(&mut self) {
         // In month view, Select means switch to day view for the focused date
         if self.view == View::Month {
-            self.view = View::Day;
+            self.switch_view(View::Day);
         }
     }
 }

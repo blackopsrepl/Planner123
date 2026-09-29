@@ -1,6 +1,14 @@
 use super::*;
 impl App {
+    /* True for the four calendar surfaces an overlay can be opened from. */
+    fn is_calendar_view(view: &View) -> bool {
+        matches!(view, View::Month | View::Week | View::Day | View::Agenda)
+    }
+
     pub(super) fn switch_view(&mut self, view: View) {
+        if Self::is_calendar_view(&view) {
+            self.return_view = view.clone();
+        }
         self.view = view;
         self.sidebar_focused = false;
         self.reload_events_if_needed();
@@ -187,22 +195,23 @@ impl App {
 
     pub(super) fn handle_escape(&mut self) {
         match self.view {
+            // Closing an overlay returns to the calendar view it was opened
+            // from. It has to go through `switch_view`: the overlay may have
+            // been opened from a view whose window is narrower than a month
+            // (day/week), and returning must re-anchor and load that view's
+            // range instead of rendering a stale one.
             View::Help
             | View::EventForm
             | View::IcalImport
             | View::QuickAdd
             | View::GoogleAuth
-            | View::GoogleManage => {
-                // Closing an overlay returns to the month grid. It has to go
-                // through `switch_view`: the overlay may have been opened from a
-                // view whose window is narrower than a month (day/week), in
-                // which case the grid must re-anchor to the focused date and
-                // load that month instead of rendering the stale display month.
-                self.switch_view(View::Month);
+            | View::GoogleManage
+            | View::CalendarList
+            | View::PlannerInbox => {
+                let return_view = self.return_view.clone();
+                self.switch_view(return_view);
             }
             View::PlannerTaskForm | View::PlannerSettingsForm => self.view = View::PlannerInbox,
-            View::PlannerInbox => self.switch_view(View::Month),
-            View::CalendarList => self.switch_view(View::Month),
             _ => {}
         }
     }

@@ -104,6 +104,11 @@ pub struct App {
     pub sidebar_focused: bool,
     pub calendar_list_index: usize,
 
+    /// The last calendar view (month/week/day/agenda) the app was in. Overlays
+    /// and the sidebar return here instead of always snapping to the month
+    /// grid, so opening a form from the week view does not cost you the week.
+    pub return_view: View,
+
     // ── Event form state ─────────────────────────────────────────
     pub form_editing_event: Option<Event>, // None = creating new
     pub form_is_new: bool,
@@ -199,6 +204,7 @@ impl App {
             completed_event_ids: HashSet::new(),
             sidebar_focused: false,
             calendar_list_index: 0,
+            return_view: View::Month,
             form_editing_event: None,
             form_is_new: true,
             form_field_index: 0,
