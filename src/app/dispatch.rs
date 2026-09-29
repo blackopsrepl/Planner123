@@ -8,7 +8,13 @@ impl App {
     pub fn dispatch(&mut self, action: Action) {
         match action {
             Action::Quit => self.running = false,
-            Action::Help => self.view = View::Help,
+            Action::Help => {
+                // The overlay opens with the current surface's keys at the top;
+                // a scroll position left over from an earlier visit would hide
+                // exactly the part it exists to show.
+                self.help_scroll = 0;
+                self.view = View::Help;
+            }
             Action::Escape => self.handle_escape(),
 
             // View switching
