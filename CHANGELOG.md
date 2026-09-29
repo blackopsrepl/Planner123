@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.6](https://github.com/blackopsrepl/Planner123/compare/v0.6.5...v0.6.6) (2026-09-29)
+
+
+### Bug Fixes
+
+* **keys:** make Enter mean something, and stop binding keys that do nothing c12cb8f
+
 ## [0.6.5](https://github.com/blackopsrepl/Planner123/compare/v0.6.4...v0.6.5) (2026-09-29)
 
 
