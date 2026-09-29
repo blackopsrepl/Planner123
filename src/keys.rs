@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::KeyEvent;
 
 /* All distinct views the application can be in. */
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,45 +98,25 @@ pub enum Action {
     None,
 }
 
-/* Resolve a key event to an action for the current view. */
+/* Key hint tuple: (key label, description). */
+pub type Hint = (&'static str, &'static str);
+
+mod registry;
+
+pub use registry::{
+    bar_hints, bar_hints_within, contexts, help_sections, hint_width, rows, section_of, tables,
+    Binding, Context, Key, Section, CONTROL,
+};
+
+/* Resolve a key event to an action for the current view.
+
+The keymap itself lives in `registry`: one row per binding, read by this
+resolver, the status bar and the help overlay alike. */
 pub fn resolve(view: &View, key: KeyEvent) -> Action {
-    use KeyCode::*;
-    use KeyModifiers as Mod;
-
-    // ── Global (Ctrl-modified) ───────────────────────────────────
-    if key.modifiers == Mod::CONTROL {
-        return match key.code {
-            Char('c') | Char('q') => Action::Quit,
-            _ => Action::None,
-        };
-    }
-
-    // ── View-specific ─────────────────────────────────────────────
-    match view {
-        View::Month => resolve_month(key),
-        View::Week => resolve_time_grid(key),
-        View::Day => resolve_time_grid(key),
-        View::Agenda => resolve_agenda(key),
-        View::CalendarList => resolve_calendar_list(key),
-        View::EventForm => resolve_event_form(key),
-        View::IcalImport => resolve_ical_import(key),
-        View::QuickAdd => resolve_input(key),
-        View::Help => resolve_help(key),
-        View::GoogleManage => resolve_google_manage(key),
-        View::GoogleAuth => resolve_google_auth(key),
-        View::PlannerInbox => resolve_planner_inbox(key),
-        View::PlannerTaskForm => resolve_event_form(key),
-        View::PlannerSettingsForm => resolve_event_form(key),
-    }
+    registry::resolve(Context::of(view), key)
 }
 
-mod forms;
-mod google;
-mod hints;
-mod navigation;
-
-use forms::*;
-use google::*;
-use navigation::*;
-
-pub use hints::{hints, Hint};
+/* The status bar chips of a view, in the order the registry lists them. */
+pub fn hints(view: &View) -> Vec<Hint> {
+    bar_hints(Context::of(view))
+}
