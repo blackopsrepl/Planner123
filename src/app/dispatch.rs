@@ -14,8 +14,40 @@ impl App {
             return;
         }
 
+        /* The help filter takes typed input; scrolling still works through the
+        arrows and page keys. */
+        if self.view == View::Help && self.help_filtering {
+            self.handle_help_filter_key(key);
+            return;
+        }
+
         let action = crate::keys::resolve(&self.view, key);
         self.handle_key_action(action);
+    }
+
+    fn handle_help_filter_key(&mut self, key: crossterm::event::KeyEvent) {
+        use crossterm::event::KeyCode;
+        match key.code {
+            // Esc clears the filter and stays in the overlay: closing it is a
+            // second Esc, which is what the status bar has always promised.
+            KeyCode::Esc => {
+                self.help_filtering = false;
+                self.help_query.clear();
+                self.help_scroll = 0;
+            }
+            KeyCode::Enter => self.help_filtering = false,
+            KeyCode::Down | KeyCode::PageDown => self.scroll_page(10),
+            KeyCode::Up | KeyCode::PageUp => self.scroll_page(-10),
+            KeyCode::Backspace => {
+                self.help_query.pop();
+                self.help_scroll = 0;
+            }
+            KeyCode::Char(character) => {
+                self.help_query.push(character);
+                self.help_scroll = 0;
+            }
+            _ => {}
+        }
     }
 
     /* Split out so the palette can run a command through the same path a key
@@ -29,10 +61,16 @@ impl App {
             Action::Quit => self.running = false,
             Action::Help => {
                 // The overlay opens with the current surface's keys at the top;
-                // a scroll position left over from an earlier visit would hide
-                // exactly the part it exists to show.
+                // a scroll position or filter left over from an earlier visit
+                // would hide exactly the part it exists to show.
                 self.help_scroll = 0;
+                self.help_filtering = false;
+                self.help_query.clear();
                 self.view = View::Help;
+            }
+            Action::HelpFilter => {
+                self.help_filtering = true;
+                self.help_scroll = 0;
             }
             Action::Escape => self.handle_escape(),
 

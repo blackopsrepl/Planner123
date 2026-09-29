@@ -146,6 +146,9 @@ pub struct App {
 
     // ── Help popup ────────────────────────────────────────────────
     pub help_scroll: u16,
+    /// True while the overlay is taking typed input for its filter.
+    pub help_filtering: bool,
+    pub help_query: String,
 
     // ── Google Auth wizard ────────────────────────────────────────
     pub google_auth_client_id: String,
@@ -239,6 +242,8 @@ impl App {
             date_jump_input: String::new(),
             agenda_scroll: 0,
             help_scroll: 0,
+            help_filtering: false,
+            help_query: String::new(),
             google_auth_client_id: String::new(),
             google_auth_client_secret: String::new(),
             google_auth_field: 0,

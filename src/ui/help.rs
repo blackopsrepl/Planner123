@@ -2,7 +2,8 @@
 
 The overlay opens with the section for the surface you are looking from, so
 what you can press here is on screen without scrolling. The rest of the map
-follows for reference. */
+follows for reference. `/` filters it by typing, which is what makes a map this
+size a lookup instead of a scroll. */
 
 use ratatui::{
     style::Modifier,
@@ -22,14 +23,22 @@ pub fn render_help(app: &App, frame: &mut Frame) {
 
     frame.render_widget(Clear, area);
 
+    let title = if app.help_filtering {
+        format!(" Keybindings — filter: {}▏ ", app.help_query)
+    } else if app.help_query.is_empty() {
+        " Keybindings ".to_string()
+    } else {
+        format!(" Keybindings — /{} ", app.help_query)
+    };
+
     let block = Block::default()
-        .title(" Keybindings ")
+        .title(title)
         .title_style(t.popup_title())
         .borders(Borders::ALL)
         .border_style(t.border_focused())
         .style(t.popup());
 
-    let lines = help_lines(&app.view);
+    let lines = help_lines(&app.view, &app.return_view, &app.help_query);
     let paragraph = Paragraph::new(lines)
         .block(block)
         .wrap(Wrap { trim: false })
@@ -38,12 +47,13 @@ pub fn render_help(app: &App, frame: &mut Frame) {
     frame.render_widget(paragraph, area);
 }
 
-/* One heading and its key lines per section, the current surface first. */
-fn help_lines(view: &View) -> Vec<Line<'static>> {
-    let current = keys::section_of(view);
+/* One heading and its key lines per section, the current surface first, filtered
+by whatever has been typed after `/`. */
+fn help_lines(view: &View, came_from: &View, query: &str) -> Vec<Line<'static>> {
+    let current = keys::section_of(view).filter(|section| *section != keys::Section::Help);
     let mut lines: Vec<Line<'static>> = Vec::new();
 
-    for (section, title, rows) in keys::help_sections(view) {
+    for (section, title, rows) in keys::help_sections_for(view, came_from, query) {
         if !lines.is_empty() {
             lines.push(Line::from(""));
         }
@@ -51,6 +61,14 @@ fn help_lines(view: &View) -> Vec<Line<'static>> {
         for (key_name, desc) in rows {
             lines.push(binding(key_name, desc));
         }
+    }
+
+    if lines.is_empty() {
+        let t = theme();
+        lines.push(Line::from(Span::styled(
+            format!("  no key matches \u{201c}{query}\u{201d}"),
+            t.dimmed(),
+        )));
     }
 
     lines

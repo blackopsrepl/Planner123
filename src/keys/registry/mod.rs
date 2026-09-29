@@ -22,7 +22,7 @@ mod sections;
 
 pub use chips::{bar_hints, bar_hints_within, hint_width};
 pub use key::Key;
-pub use sections::{help_sections, section_of, Section};
+pub use sections::{help_sections, help_sections_for, section_of, Section};
 
 use calendar::{AGENDA, DAY, MONTH, WEEK};
 use overlays::{

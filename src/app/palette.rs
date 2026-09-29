@@ -1,4 +1,5 @@
 use super::*;
+use crate::keys::fuzzy_match;
 
 /* The command palette.
 
@@ -93,16 +94,6 @@ pub fn commands() -> Vec<Command> {
             action: Action::Quit,
         },
     ]
-}
-
-/* Case-insensitive subsequence match: "gcal" finds "Sync with Google
-Calendar", "exp" finds "Export .ics file". An empty query matches everything. */
-pub fn fuzzy_match(query: &str, label: &str) -> bool {
-    let mut label_chars = label.chars().flat_map(char::to_lowercase);
-    query
-        .chars()
-        .flat_map(char::to_lowercase)
-        .all(|wanted| label_chars.any(|candidate| candidate == wanted))
 }
 
 impl App {

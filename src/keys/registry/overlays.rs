@@ -101,6 +101,7 @@ pub static QUICK_ADD: &[Binding] = &[
 pub static HELP: &[Binding] = &[
     b!(Help, [Char('j'), Down], A::ScrollDown, bar!("j/k", "scroll"), help!(S::Help, "j / k", "Scroll")),
     b!(Help, [Char('k'), Up], A::ScrollUp, None, None),
+    b!(Help, [Char('/')], A::HelpFilter, bar!("/", "filter"), help!(S::Help, "/", "Filter the keys by typing")),
     b!(Help, [Esc, Char('q'), Char('?')], A::Escape, bar!("Esc", "close"), help!(S::Help, "Esc / ?", "Close help")),
     b!(Help, [PageUp], A::ScrollPageUp, None, help!(S::Help, "PgUp / PgDn", "Scroll page")),
     b!(Help, [PageDown], A::ScrollPageDown, None, None),

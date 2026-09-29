@@ -4,7 +4,7 @@ A section is a surface's documentation: the keys that work there, in row
 order. The overlay opens with the section for the surface you are looking from,
 then the global keys, then everything else. */
 
-use crate::keys::{Hint, View};
+use crate::keys::{fuzzy_match, Hint, View};
 
 use super::{tables, Context};
 
@@ -98,13 +98,55 @@ pub fn section_of(view: &View) -> Option<Section> {
     section_for_context(Context::of(view))
 }
 
-/* The help overlay contents for a view: sections in reading order, each with
-its key lines. */
+/* The help overlay contents for a view: sections in reading order, each with its
+key lines, opening on that view's own section. */
 pub fn help_sections(view: &View) -> Vec<(Section, &'static str, Vec<Hint>)> {
-    let current = section_of(view);
+    help_sections_for(view, view, "")
+}
 
-    /* Rows are collected in table order and deduplicated: a key bound in five
-    surfaces is documented once per section it names. */
+/* The same, for an overlay opened from `came_from` and filtered by `query`.
+
+`came_from` matters for the help overlay itself: `?` pressed while looking at
+the month grid is a question about the month grid, so the month's keys lead and
+the overlay's own keys follow it. A query keeps only the lines that match it,
+and a section with no match disappears — which is what turns this from a scroll
+into a lookup. */
+pub fn help_sections_for(
+    view: &View,
+    came_from: &View,
+    query: &str,
+) -> Vec<(Section, &'static str, Vec<Hint>)> {
+    let head = if *view == View::Help {
+        section_of(came_from).or(Some(Section::Help))
+    } else {
+        section_of(view)
+    };
+
+    let documented = documented_lines();
+    let mut order = ORDER.to_vec();
+    if let Some(head) = head {
+        order.sort_by_key(|section| *section != head);
+    }
+
+    order
+        .into_iter()
+        .filter_map(|section| {
+            let lines: Vec<Hint> = documented
+                .iter()
+                .filter(|(row_section, _, _)| *row_section == section)
+                .map(|(_, key, desc)| (*key, *desc))
+                .filter(|(key, desc)| {
+                    query.is_empty() || fuzzy_match(query, key) || fuzzy_match(query, desc)
+                })
+                .collect();
+            (!lines.is_empty()).then_some((section, section.title(), lines))
+        })
+        .collect()
+}
+
+/* Documented lines, deduplicated, in table order: a key bound in five surfaces
+is documented once per section it names. */
+fn documented_lines() -> Vec<(Section, &'static str, &'static str)> {
     let mut documented: Vec<(Section, &'static str, &'static str)> = Vec::new();
     for table in tables() {
         for row in table.iter() {
@@ -117,25 +159,5 @@ pub fn help_sections(view: &View) -> Vec<(Section, &'static str, Vec<Hint>)> {
             }
         }
     }
-
-    let mut order = ORDER.to_vec();
-    if let Some(current) = current {
-        order.sort_by_key(|section| *section != current);
-    }
-
-    order
-        .into_iter()
-        .filter_map(|section| {
-            let lines: Vec<Hint> = documented
-                .iter()
-                .filter(|(row_section, _, _)| *row_section == section)
-                .map(|(_, key, desc)| (*key, *desc))
-                .collect();
-            if lines.is_empty() {
-                None
-            } else {
-                Some((section, section.title(), lines))
-            }
-        })
-        .collect()
+    documented
 }

@@ -76,6 +76,9 @@ pub enum Action {
     PaletteUp,   // ↑
     PaletteDown, // ↓
 
+    // ── Help overlay ─────────────────────────────────────────────
+    HelpFilter, // / = filter the keys by typing
+
     // ── Google Calendar ──────────────────────────────────────────
     GoogleManage,
     GoogleSync,
@@ -112,9 +115,19 @@ pub type Hint = (&'static str, &'static str);
 mod registry;
 
 pub use registry::{
-    bar_hints, bar_hints_within, contexts, help_sections, hint_width, rows, section_of, tables,
-    Binding, Context, Key, Section, CONTROL,
+    bar_hints, bar_hints_within, contexts, help_sections, help_sections_for, hint_width, rows,
+    section_of, tables, Binding, Context, Key, Section, CONTROL,
 };
+
+/* Case-insensitive subsequence match, used by the palette and the help filter:
+"gcal" finds "Sync with Google Calendar". An empty query matches everything. */
+pub fn fuzzy_match(query: &str, label: &str) -> bool {
+    let mut label_chars = label.chars().flat_map(char::to_lowercase);
+    query
+        .chars()
+        .flat_map(char::to_lowercase)
+        .all(|wanted| label_chars.any(|candidate| candidate == wanted))
+}
 
 /* Resolve a key event to an action for the current view.
 

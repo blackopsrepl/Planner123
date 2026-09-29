@@ -107,3 +107,50 @@ fn flatten(label: &str) -> String {
         .collect::<String>()
         .to_lowercase()
 }
+
+/* `/` turns the overlay into a lookup. A query keeps only the lines that match,
+skips the sections that empty out, and an unmatched query says so instead of
+showing a blank box. */
+#[test]
+fn filtering_narrows_the_overlay() {
+    let all = keys::help_sections_for(&View::Month, &View::Month, "");
+    let unfiltered_rows: usize = all.iter().map(|(_, _, rows)| rows.len()).sum();
+    assert!(unfiltered_rows > 50, "the overlay should be a full map");
+
+    let sync = keys::help_sections_for(&View::Month, &View::Month, "sync");
+    let sync_rows: Vec<&str> = sync
+        .iter()
+        .flat_map(|(_, _, rows)| rows.iter().map(|(_, desc)| *desc))
+        .collect();
+    assert!(
+        sync_rows.iter().any(|desc| desc.contains("Sync")),
+        "a query must keep the lines it matches: {sync_rows:?}"
+    );
+    assert!(
+        sync.iter().map(|(_, _, rows)| rows.len()).sum::<usize>() < unfiltered_rows,
+        "a query must drop the lines it does not match"
+    );
+
+    // The key itself matches too, not only the description.
+    let by_key = keys::help_sections_for(&View::Help, &View::Help, "/");
+    assert!(by_key
+        .iter()
+        .flat_map(|(_, _, rows)| rows.iter())
+        .any(|(_, desc)| desc.contains("Filter")));
+
+    assert!(keys::help_sections_for(&View::Month, &View::Month, "zzzz").is_empty());
+}
+
+/* `?` from the month grid is a question about the month grid: the month's keys
+lead, and the overlay's own keys follow. */
+#[test]
+fn the_overlay_leads_with_the_surface_help_was_opened_from() {
+    for view in every_view() {
+        let sections = keys::help_sections_for(&View::Help, &view, "");
+        let expected = keys::section_of(&view).unwrap_or(keys::Section::Help);
+        assert_eq!(
+            sections[0].0, expected,
+            "help opened from {view:?} leads with the wrong section"
+        );
+    }
+}

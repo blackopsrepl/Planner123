@@ -151,7 +151,7 @@ const EXPECTED_BAR: &[(View, &[&str])] = &[
     (View::QuickAdd, &["Enter add", "Esc cancel"]),
     (View::Palette, &["↑/↓ move", "Enter run", "Esc close"]),
     (View::DateJump, &["Enter go", "Esc cancel"]),
-    (View::Help, &["j/k scroll", "Esc close"]),
+    (View::Help, &["j/k scroll", "/ filter", "Esc close"]),
     (View::GoogleManage, &["j/k nav", "Enter import", "r refresh", "l login", "o logout", "S sync", "Esc close"]),
     (View::GoogleAuth, &["Tab field", "Enter confirm", "Esc cancel"]),
     (View::PlannerInbox, &["j/k inspect task", "n new task", "o optimize", "A apply", "s settings", "Esc close"]),
@@ -274,6 +274,7 @@ fn representative_keys_resolve_as_before() {
         (View::PlannerInbox, char_key('A'), Action::PlannerApply),
         (View::PlannerInbox, char_key('a'), Action::None),
         (View::Help, char_key('?'), Action::Escape),
+        (View::Help, char_key('/'), Action::HelpFilter),
         (View::Help, key(KeyCode::PageUp), Action::ScrollPageUp),
     ];
 

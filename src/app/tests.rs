@@ -1,8 +1,9 @@
 use chrono::NaiveDate;
 
-use super::palette::{commands, fuzzy_match, parse_date_input};
+use super::palette::{commands, parse_date_input};
 use super::query::{status_is_stale, STATUS_TICKS};
 use super::utilities::google_sync_finished_status;
+use crate::keys::fuzzy_match;
 use crate::keys::Action;
 
 #[test]
