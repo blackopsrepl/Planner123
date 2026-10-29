@@ -20,6 +20,25 @@
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Week and day grid
+
+Two text rows per hour, so each row is 30 minutes. An event starts on the row
+its start time falls in and covers every row its interval touches, at least
+one. Events whose rows meet are drawn side by side in lanes, so every timed
+event is visible and no two blocks share a cell; an overnight event is clipped
+to each day it touches. All-day events sit in an `all` strip above the hours.
+
+```text
+       Mon 26        Tue 27
+all                  ▌Holiday
+09:00 ▌Long ────────────────────
+      ▌09:00        ▌Dentist        ← 09:30-10:00, on the half-hour row
+10:00 ▌     ▌Inner ─▌Prep demo      ← 10:00, right below it
+      ▌             ▌10:00
+```
+
+`Inner` (10:00-10:30) overlaps `Long` (09:00-11:00), so it gets its own lane.
+
 ## Overlay surfaces
 
 - Google management: connection state, imported calendar health, pending outbound work, conflicts, and discoverable calendars for import

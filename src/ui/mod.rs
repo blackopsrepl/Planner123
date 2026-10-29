@@ -27,6 +27,7 @@ pub mod palette;
 pub mod planner;
 pub mod quick_add;
 pub mod status_bar;
+pub mod time_grid;
 pub mod util;
 pub mod week_view;
 

@@ -12,7 +12,7 @@ use ratatui::{
 
 use crate::app::App;
 use crate::theme::theme;
-use crate::ui::week_view::render_time_grid;
+use crate::ui::time_grid::render_time_grid;
 
 pub fn render_day(app: &App, frame: &mut Frame, area: Rect) {
     let t = theme();

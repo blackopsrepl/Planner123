@@ -93,14 +93,22 @@ impl Event {
     }
 
     /// True if this event occurs on the given wall-clock date.
+    ///
+    /// The end is exclusive: an event ending exactly at midnight (every
+    /// all-day event, and a timed event that runs to 24:00) does not occur on
+    /// the day that midnight starts.
     pub fn occurs_on(&self, date: NaiveDate) -> bool {
-        if let (Some(start), Some(end)) = (self.start_local_dt(), self.end_local_dt()) {
-            let s = start.date_naive();
-            let e = end.date_naive();
-            date >= s && date <= e
-        } else {
-            false
+        let (Some(start), Some(end)) = (self.start_local_dt(), self.end_local_dt()) else {
+            return false;
+        };
+        let start = start.naive_local();
+        let end = end.naive_local();
+        let day_start = date.and_time(chrono::NaiveTime::MIN);
+        let day_end = day_start + chrono::Duration::days(1);
+        if end <= start {
+            return start >= day_start && start < day_end;
         }
+        start < day_end && end > day_start
     }
 
     pub fn is_recurring(&self) -> bool {
@@ -111,3 +119,34 @@ impl Event {
 // ── EventDependency ──────────────────────────────────────────────────
 
 /* A directed dependency edge between two events. Maps to `event_dependencies` table. */
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /* Whether an event from `start` to `end` (November 2026) is on day `day`. */
+    fn on(start: &str, end: &str, day: u32) -> bool {
+        let at = |t: &str| format!("2026-11-{t}");
+        let date = NaiveDate::from_ymd_opt(2026, 11, day).unwrap();
+        Event::new("cal", "e", at(start), at(end), "UTC").occurs_on(date)
+    }
+
+    #[test]
+    fn an_event_ending_at_midnight_is_not_on_the_next_day() {
+        assert!(on("02 23:00:00", "03 00:00:00", 2));
+        assert!(!on("02 23:00:00", "03 00:00:00", 3));
+    }
+
+    #[test]
+    fn an_overnight_event_is_on_both_days() {
+        assert!(on("02 22:00:00", "03 01:30:00", 2));
+        assert!(on("02 22:00:00", "03 01:30:00", 3));
+        assert!(!on("02 22:00:00", "03 01:30:00", 4));
+    }
+
+    #[test]
+    fn a_zero_length_event_is_on_its_start_day() {
+        assert!(on("02 00:00:00", "02 00:00:00", 2));
+        assert!(!on("02 00:00:00", "02 00:00:00", 1));
+    }
+}
