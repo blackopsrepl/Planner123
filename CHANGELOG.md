@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.7](https://github.com/blackopsrepl/Planner123/compare/v0.6.6...v0.6.7) (2026-10-29)
+
+
+### Features
+
+* **planner:** move to SolverForge 0.23.0 and schedule what fits ([63982f6](https://github.com/blackopsrepl/Planner123/commit/63982f6f773e8e520d8ee2f610207151d6152f58))
+
+
+### Bug Fixes
+
+* **calendar:** draw every occurrence of a recurring event ([ef1d3c0](https://github.com/blackopsrepl/Planner123/commit/ef1d3c03f95aac2359e92a461d0fb194bd7db502))
+* **week:** draw every event, side by side when they overlap ([d5572ad](https://github.com/blackopsrepl/Planner123/commit/d5572ad346581f4d97e02b9bb126033d10bcef64))
+
+
 ## [0.6.6](https://github.com/blackopsrepl/Planner123/compare/v0.6.5...v0.6.6) (2026-09-29)
 
 
