@@ -33,6 +33,8 @@ Direct cargo commands used in CI:
 - `src/cli.rs` and `src/cli/`: stable typed CLI facade plus arguments, handlers, runtime, validation, and backend modules
 - `src/calendar_service.rs` and `src/calendar_service/`: shared calendar facade plus validation, mutation, and test modules
 - `src/event_service.rs` and `src/event_service/`: shared event facade plus validation and mutation modules
+- `src/ui/time_grid.rs` and `src/ui/time_grid/`: the hour grid shared by the week and day views. `layout` places every timed event on 30-minute rows and gives overlapping ones their own lanes, so no event is hidden and no two share a cell
+- `src/recurrence.rs` and `src/recurrence/`: event-form presets plus the one recurrence expansion that both the calendar views and planner busy time read
 - `src/keys.rs` and `src/keys/registry/`: the keymap. One table holds every binding, and `resolve`, the status bar chips and the help overlay all read it, so they cannot drift apart. Add or move a key here, never in a renderer
 - `src/ical.rs` and `src/ical/`: `.ics` facade plus parsing, candidate, time, import/export, and test modules
 - `src/google/`: OAuth, calendar discovery, typed event API, and Google payload mapping; its larger concerns use the same facade-plus-fragments pattern
