@@ -1,0 +1,50 @@
+# Release configuration for csemver.
+#
+# csemver owns CHANGELOG.md and every version surface below; never edit them
+# by hand. Run `make pre-release` on the tree to release, then `csemver`
+# (preview with `csemver --dry-run`). csemver does not push: push the branch
+# and the tag to every remote afterwards.
+#
+# Version surfaces: the crate version in Cargo.toml, this crate's entry in
+# Cargo.lock, and the README version badge.
+
+tagPrefix = "v"
+releaseCommitMessageFormat = "chore(release): {{currentTag}}"
+commitUrlFormat = "https://github.com/blackopsrepl/Planner123/commit/{{hash}}"
+compareUrlFormat = "https://github.com/blackopsrepl/Planner123/compare/{{previousTag}}...{{currentTag}}"
+issueUrlFormat = "https://github.com/blackopsrepl/Planner123/issues/{{id}}"
+
+packageFiles = [
+  { filename = "Cargo.toml", type = "regex", pattern = '^version = "([0-9]+\.[0-9]+\.[0-9]+)"', versionGroup = 1 },
+]
+
+types = [
+  { type = "feat", section = "Features" },
+  { type = "fix", section = "Bug Fixes" },
+  { type = "chore", effect = "hidden" },
+  { type = "docs", effect = "hidden" },
+  { type = "style", effect = "hidden" },
+  { type = "refactor", effect = "hidden" },
+  { type = "perf", effect = "hidden" },
+  { type = "test", effect = "hidden" },
+  { type = "build", effect = "hidden" },
+  { type = "ci", effect = "hidden" },
+]
+
+[[bumpFiles]]
+filename = "Cargo.toml"
+type = "regex"
+pattern = '^version = "([0-9]+\.[0-9]+\.[0-9]+)"'
+versionGroup = 1
+
+[[bumpFiles]]
+filename = "Cargo.lock"
+type = "regex"
+pattern = '^name = "planner123"$[[:space:]]^version = "([0-9]+\.[0-9]+\.[0-9]+)"'
+versionGroup = 1
+
+[[bumpFiles]]
+filename = "README.md"
+type = "regex"
+pattern = 'badge/version-v([0-9]+\.[0-9]+\.[0-9]+)-'
+versionGroup = 1

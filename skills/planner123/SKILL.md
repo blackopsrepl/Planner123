@@ -222,12 +222,13 @@ Rules that keep changes mergeable:
   isolate with `XDG_DATA_HOME` temp dirs; Google fakes use
   `PLANNER123_TEST_GOOGLE_SYNC` / `..._GOOGLE_DISCOVERY` /
   `PLANNER123_TEST_KEYRING_SERVICE`.
-- Releases are cut with `npx commit-and-tag-version` from conventional commits;
-  never hand-edit `CHANGELOG.md` or version files. `.versionrc.js` declares every
-  surface the tool bumps (`Cargo.toml`, `Cargo.lock`, the `README.md` badge) and
-  the tag/message/URL formats — the tool owns all of them, so a missing or
+- Releases are cut with `csemver` from conventional commits; never hand-edit
+  `CHANGELOG.md` or version files. `csemver.toml` declares every surface the
+  tool bumps (`Cargo.toml`, `Cargo.lock`, the `README.md` badge) and the
+  tag/message/URL formats — the tool owns all of them, so a missing or
   incomplete surface silently survives a release. Order: `make pre-release`,
-  then the tool, then push the branch and the tag to every remote.
+  `csemver --dry-run`, `csemver`, then push the branch and the tag to every
+  remote (csemver does not push).
 - **One release per coherent iteration, at the moment it lands.** Tag each
   finished change-set (a feature, a fix batch, a subsystem) as soon as its work
   is green, instead of accumulating commits and cutting one release for several
