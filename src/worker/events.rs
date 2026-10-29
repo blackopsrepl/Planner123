@@ -16,7 +16,7 @@ impl Worker {
                 let conn = crate::db::open()?;
                 let from_str = format!("{} 00:00:00", start);
                 let to_str = format!("{} 23:59:59", end);
-                let events = crate::db::load_events_in_range(&conn, &from_str, &to_str)?;
+                let events = crate::db::load_events_for_window(&conn, &from_str, &to_str)?;
                 Ok(events)
             })();
             match result {

@@ -27,7 +27,7 @@ pub fn render_agenda(app: &App, frame: &mut Frame, area: Rect) {
     frame.render_widget(block, area);
 
     let inner_width = inner.width.saturating_sub(2) as usize;
-    let visible_events = app.visible_events();
+    let visible_events = app.visible_occurrences();
 
     // Group events by date, starting from today
     let mut lines: Vec<Line> = Vec::new();
@@ -94,11 +94,7 @@ pub fn render_agenda(app: &App, frame: &mut Frame, area: Rect) {
         let max_title_w = inner_width.saturating_sub(time_str.len() + 4);
         let title = truncate(&ev.title, max_title_w);
 
-        let is_selected = app
-            .events
-            .get(app.selected_event_index)
-            .map(|se| se.id == ev.id)
-            .unwrap_or(false);
+        let is_selected = app.selected_event().is_some_and(|se| se.id == ev.id);
 
         let title_style = if is_selected {
             t.event_selected()

@@ -5,7 +5,7 @@ side, and keeps all-day events out of the hours. Rendered through the real
 mod common;
 
 use chrono::{Datelike, Duration, Local};
-use common::{pump_until, seeded_app, serial_guard};
+use common::{pump_until, seeded_app, seeded_app_with, serial_guard};
 use planner123::keys::View;
 use ratatui::{backend::TestBackend, Terminal};
 
@@ -42,7 +42,8 @@ fn rendered_week() -> Vec<String> {
         std::time::Duration::from_secs(5),
         |app| app.events.len() == EVENTS.len()
     ));
-    for event in app.events.iter_mut() {
+    // The grid draws `occurrences`; give each drawn event its own title.
+    for event in app.occurrences.iter_mut() {
         let (_, _, _, title) = EVENTS
             .iter()
             .zip(&bounds)
@@ -101,4 +102,47 @@ fn all_day_events_sit_in_the_strip_not_on_the_hours() {
     assert!(strip < first_event);
     assert!(rows[strip].contains("Holiday"));
     assert_eq!(rows.iter().filter(|row| row.contains("Holiday")).count(), 1);
+}
+
+#[test]
+fn a_recurring_series_started_weeks_ago_is_drawn_on_every_day_it_repeats() {
+    let _guard = serial_guard();
+    let dir = tempfile::TempDir::new().unwrap();
+    let today = Local::now().date_naive();
+    let monday = today - Duration::days(today.weekday().num_days_from_monday() as i64);
+    let first = monday - Duration::weeks(6);
+    let (rt, mut app) = seeded_app_with(&dir, |calendar_id| {
+        let mut standup = planner123::models::Event::new(
+            calendar_id,
+            "Standup",
+            format!("{first} 09:00:00"),
+            format!("{first} 09:30:00"),
+            "UTC",
+        );
+        standup.rrule = Some("FREQ=WEEKLY;BYDAY=MO,WE,FR".into());
+        vec![standup]
+    });
+    assert!(pump_until(
+        &mut app,
+        &rt,
+        std::time::Duration::from_secs(5),
+        |app| !app.occurrences.is_empty()
+    ));
+    app.view = View::Week;
+    app.week_scroll = 8;
+
+    let mut terminal = Terminal::new(TestBackend::new(128, 40)).unwrap();
+    terminal
+        .draw(|frame| planner123::ui::render(&mut app, frame))
+        .unwrap();
+    let buffer = terminal.backend().buffer().clone();
+    let row = (0..buffer.area.height)
+        .map(|y| {
+            (0..buffer.area.width)
+                .map(|x| buffer[(x, y)].symbol().to_string())
+                .collect::<String>()
+        })
+        .find(|row| row.contains("Standup"))
+        .expect("the series is drawn this week");
+    assert_eq!(row.matches("Standup").count(), 3, "Mon, Wed and Fri: {row}");
 }

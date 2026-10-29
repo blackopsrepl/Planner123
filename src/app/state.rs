@@ -77,7 +77,8 @@ pub struct App {
     pub calendars: Vec<Calendar>,
     pub calendar_sync_state: HashMap<String, CalendarSyncState>,
     pub projects: Vec<Project>,
-    pub events: Vec<Event>, // events in current view window
+    pub events: Vec<Event>,      // events in current view window
+    pub occurrences: Vec<Event>, // `events` as drawn: one entry per occurrence
     pub dependencies: Vec<EventDependency>,
     pub planner_tasks: Vec<PlanningTask>,
     pub planner_proposal: Option<crate::planner::ProposalDetail>,
@@ -198,6 +199,7 @@ impl App {
             calendar_sync_state: HashMap::new(),
             projects: Vec::new(),
             events: Vec::new(),
+            occurrences: Vec::new(),
             dependencies: Vec::new(),
             planner_tasks: Vec::new(),
             planner_proposal: None,

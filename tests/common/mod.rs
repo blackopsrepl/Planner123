@@ -51,13 +51,23 @@ pub fn pump_until(
 supplied start/end pair. Waits for the startup load to settle so later
 assertions observe only navigation-driven loads. */
 pub fn seeded_app(dir: &TempDir, events: &[(&str, &str)]) -> (Runtime, App) {
+    seeded_app_with(dir, |calendar_id| {
+        events
+            .iter()
+            .map(|(start, end)| Event::new(calendar_id, "Probe", *start, *end, "UTC"))
+            .collect()
+    })
+}
+
+/* Like `seeded_app`, for callers that build the events themselves from the
+default calendar id. */
+pub fn seeded_app_with(dir: &TempDir, events: impl FnOnce(&str) -> Vec<Event>) -> (Runtime, App) {
     std::env::set_var("XDG_DATA_HOME", dir.path());
 
     {
         let conn = planner123::db::open().unwrap();
         let calendar_id = planner123::db::load_calendars(&conn).unwrap()[0].id.clone();
-        for (start, end) in events {
-            let event = Event::new(calendar_id.clone(), "Probe", *start, *end, "UTC");
+        for event in events(&calendar_id) {
             planner123::event_service::save_event(&conn, event, true).unwrap();
         }
     }

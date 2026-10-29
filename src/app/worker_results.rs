@@ -38,6 +38,7 @@ impl App {
                     return;
                 }
                 self.event_window = Some((start, end));
+                self.occurrences = crate::recurrence::occurrences_between(&events, start, end);
                 self.events = events.clone();
                 // Update shared arc for notification task
                 let arc = self.events_arc.clone();
@@ -91,6 +92,7 @@ impl App {
             }
             WorkerResult::EventDeleted(id) => {
                 self.events.retain(|e| e.id != id);
+                self.occurrences.retain(|e| e.id != id);
                 self.set_status("Event deleted.", false);
             }
             WorkerResult::EventSaved(ev) => {

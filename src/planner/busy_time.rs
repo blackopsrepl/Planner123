@@ -37,11 +37,9 @@ pub(super) fn event_busy_intervals(
         None => return Ok(Vec::new()),
     };
     let duration = end - start;
-    let starts = match event.rrule.as_deref() {
-        Some(rule) => expand_recurrence(event, rule, start, duration, horizon_start, horizon_end)?,
-        None => vec![start],
-    };
-
+    let starts = crate::recurrence::occurrence_starts(event, horizon_start, horizon_end)
+        .map_err(PlannerError::Validation)?
+        .unwrap_or_else(|| vec![start]);
     Ok(starts
         .into_iter()
         .map(|occurrence_start| BusyOccurrence {
@@ -77,54 +75,6 @@ pub(super) fn busy_blocker(
             .to_string(),
         recurring: occurrence.recurring,
     }
-}
-
-fn expand_recurrence(
-    event: &Event,
-    rule: &str,
-    start: DateTime<Utc>,
-    duration: chrono::Duration,
-    horizon_start: DateTime<Utc>,
-    horizon_end: DateTime<Utc>,
-) -> Result<Vec<DateTime<Utc>>, PlannerError> {
-    let timezone = event.timezone_tz().ok_or_else(|| {
-        PlannerError::Validation(format!(
-            "event '{}' has an invalid recurrence timezone '{}'",
-            event.title, event.timezone
-        ))
-    })?;
-    let recurrence_start = start.with_timezone(&rrule::Tz::from(timezone));
-    let rule = rule
-        .parse::<rrule::RRule<rrule::Unvalidated>>()
-        .map_err(|error| {
-            PlannerError::Validation(format!(
-                "event '{}' has an invalid recurrence rule: {error}",
-                event.title
-            ))
-        })?;
-    let result = rule
-        .build(recurrence_start)
-        .map_err(|error| {
-            PlannerError::Validation(format!(
-                "event '{}' has an invalid recurrence rule: {error}",
-                event.title
-            ))
-        })?
-        .after((horizon_start - duration).with_timezone(&rrule::Tz::from(timezone)))
-        .before(horizon_end.with_timezone(&rrule::Tz::from(timezone)))
-        .all(u16::MAX);
-    if result.limited {
-        return Err(PlannerError::Validation(format!(
-            "event '{}' recurrence exceeds the {}-occurrence safety limit within the planning horizon",
-            event.title,
-            u16::MAX
-        )));
-    }
-    Ok(result
-        .dates
-        .into_iter()
-        .map(|occurrence| occurrence.with_timezone(&Utc))
-        .collect())
 }
 
 /// Applied task blocks with the inbox successors that must start after them.

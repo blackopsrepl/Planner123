@@ -107,6 +107,23 @@ pub fn soft_delete_event(conn: &Connection, event_id: &str) -> Result<()> {
     Ok(())
 }
 
+/* Events the calendar must consider to draw `[from, to]`: every event that
+overlaps it, plus every recurring series that starts before it ends, since
+an earlier series can still repeat inside the window. */
+pub fn load_events_for_window(conn: &Connection, from: &str, to: &str) -> Result<Vec<Event>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, calendar_id, project_id, title, description, location,
+                start_at, end_at, all_day, rrule, google_id, google_etag,
+                reminder_minutes, timezone, created_at, updated_at, deleted_at
+         FROM events
+         WHERE deleted_at IS NULL
+           AND start_at <= ?2
+           AND (end_at >= ?1 OR rrule IS NOT NULL)
+         ORDER BY start_at",
+    )?;
+    query_events(&mut stmt, &[from, to])
+}
+
 pub fn load_events(conn: &Connection) -> Result<Vec<Event>> {
     let mut stmt = conn.prepare(
         "SELECT id, calendar_id, project_id, title, description, location,

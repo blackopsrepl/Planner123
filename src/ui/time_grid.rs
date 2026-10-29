@@ -62,7 +62,7 @@ pub fn render_time_grid(
     let days: Vec<NaiveDate> = (0..num_days)
         .map(|d| start_date + Duration::days(d as i64))
         .collect();
-    let events = app.visible_events();
+    let events = app.visible_occurrences();
 
     let mut grid = area;
     if all_day::render(app, frame, area, &days, day_col_w) {

@@ -1,3 +1,7 @@
+mod occurrences;
+
+pub use occurrences::{occurrence_starts, occurrences_between, OCCURRENCE_LIMIT};
+
 /* Standard recurrence presets for the event form UI. */
 #[derive(Debug, Clone, PartialEq)]
 pub enum RecurrencePreset {

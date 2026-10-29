@@ -23,7 +23,7 @@ pub(super) fn render(
     days: &[NaiveDate],
     day_col_w: u16,
 ) -> bool {
-    let events = app.visible_events();
+    let events = app.visible_occurrences();
     let per_day: Vec<Vec<_>> = days
         .iter()
         .map(|date| {

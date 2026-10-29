@@ -21,9 +21,24 @@ impl App {
             .collect()
     }
 
-    /// Events for a specific date.
+    /// What the calendar draws for the loaded window: every occurrence of
+    /// every visible event, recurring series expanded, sorted by start.
+    pub fn visible_occurrences(&self) -> Vec<&Event> {
+        let visible_cal_ids: std::collections::HashSet<&str> = self
+            .calendars
+            .iter()
+            .filter(|c| c.visible)
+            .map(|c| c.id.as_str())
+            .collect();
+        self.occurrences
+            .iter()
+            .filter(|e| visible_cal_ids.contains(e.calendar_id.as_str()) && e.deleted_at.is_none())
+            .collect()
+    }
+
+    /// Occurrences drawn on a specific date.
     pub fn events_on_date(&self, date: NaiveDate) -> Vec<&Event> {
-        self.visible_events()
+        self.visible_occurrences()
             .into_iter()
             .filter(|e| e.occurs_on(date))
             .collect()
