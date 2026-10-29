@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
-use rusqlite::Connection;
+use rusqlite::{Connection, ErrorCode, Transaction, TransactionBehavior};
 
 use super::{calendar::ensure_default_calendar_if_none_active, migrations};
 
@@ -66,15 +67,44 @@ pub fn open_at(path: impl AsRef<Path>) -> Result<Connection> {
     let conn = Connection::open(path)
         .with_context(|| format!("cannot open database: {}", path.display()))?;
 
+    conn.busy_timeout(Duration::from_secs(5))?;
+    enable_wal(&conn).context("cannot enable WAL journal")?;
     conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA foreign_keys = ON;
+        "PRAGMA foreign_keys = ON;
          PRAGMA synchronous = NORMAL;",
     )
     .context("cannot configure pragmas")?;
 
-    migrations::migrate(&conn).context("schema migration failed")?;
-    ensure_default_calendar_if_none_active(&conn).context("default calendar recovery failed")?;
+    // Startup workers open independently: migration checks and default seeding
+    // must share a write lock or two first launches can apply the same ALTER.
+    let transaction = Transaction::new_unchecked(&conn, TransactionBehavior::Immediate)
+        .context("cannot lock database initialization")?;
+    migrations::migrate(&transaction).context("schema migration failed")?;
+    ensure_default_calendar_if_none_active(&transaction)
+        .context("default calendar recovery failed")?;
+    transaction
+        .commit()
+        .context("cannot commit database initialization")?;
 
     Ok(conn)
+}
+
+fn enable_wal(conn: &Connection) -> rusqlite::Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match conn.execute_batch("PRAGMA journal_mode = WAL;") {
+            Ok(()) => return Ok(()),
+            Err(rusqlite::Error::SqliteFailure(error, _))
+                if matches!(
+                    error.code,
+                    ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked
+                ) && Instant::now() < deadline =>
+            {
+                // SQLite cannot always invoke its busy handler while upgrading
+                // a freshly opened database's journal mode.
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => return Err(error),
+        }
+    }
 }
