@@ -50,6 +50,19 @@ pub fn optimize(
     let built = build_plan(conn, &inputs)?;
     let horizon_end = built.horizon_end;
     let solved = solve(built.plan)?;
+    // Every hard rule binds assigned tasks only, so leaving the inbox empty is
+    // always feasible and the solver's best solution is never worse than it.
+    // A hard-infeasible result would place tasks on top of events or of each
+    // other; refuse it rather than persist an applicable proposal.
+    if solved.score.is_some_and(|score| score.hard() < 0) {
+        return Err(PlannerError::Internal(format!(
+            "planner returned a hard-infeasible solution ({})",
+            solved
+                .score
+                .map(|score| score.to_string())
+                .unwrap_or_default()
+        )));
+    }
     let penalties = task_penalties(&solved)?;
 
     let proposal_id = Uuid::new_v4().to_string();

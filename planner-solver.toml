@@ -4,6 +4,12 @@
 # `start_idx` is one scalar index over the whole horizon grid. Both phases must
 # see every declared start: a value cap would make availability further out
 # unreachable and leave feasible tasks unassigned, so no cap is set.
+#
+# Construction weighs every placement against leaving the task unassigned
+# (`preserve_unassigned`). Forcing an assignment whenever a candidate exists
+# places tasks that cannot fit on top of each other, and when local search
+# cannot repair that within the budget the best solution is the empty one:
+# an inbox larger than the free time would then schedule nothing at all.
 
 random_seed = 1
 
@@ -15,7 +21,7 @@ type = "construction_heuristic"
 construction_heuristic_type = "cheapest_insertion"
 entity_class = "SolverTask"
 variable_name = "start_idx"
-construction_obligation = "assign_when_candidate_exists"
+construction_obligation = "preserve_unassigned"
 
 [[phases]]
 type = "local_search"

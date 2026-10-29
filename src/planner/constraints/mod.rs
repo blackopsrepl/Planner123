@@ -42,6 +42,7 @@ mod assemble {
     use super::*;
 
     /// Collects the full scoring model used by `SolverPlan`.
+    #[solverforge_constraints]
     pub fn create_constraints() -> impl ConstraintSet<SolverPlan, HardMediumSoftScore> {
         (
             assign_priority::constraint(),

@@ -28,6 +28,9 @@ fn optimize_produces_a_hard_feasible_future_schedule() {
     create_task(&conn, task(calendar_id.clone(), "Focus A")).unwrap();
     create_task(&conn, task(calendar_id, "Focus B")).unwrap();
 
+    // Slots are judged against the instant the plan is built, not against the
+    // end of the solve: a slot may start during the solve itself.
+    let optimized_at = Utc::now().naive_utc();
     let proposal = optimize(&conn, Some(3)).unwrap();
     assert_eq!(proposal.items.len(), 2);
     assert!(
@@ -35,7 +38,6 @@ fn optimize_produces_a_hard_feasible_future_schedule() {
         "both tasks should be schedulable inside availability"
     );
 
-    let now = Utc::now().naive_utc();
     let existing_start = parse(&format!("{tomorrow} 10:00:00"));
     let existing_end = parse(&format!("{tomorrow} 11:00:00"));
 
@@ -44,7 +46,10 @@ fn optimize_produces_a_hard_feasible_future_schedule() {
         let start = parse(item.start_at.as_ref().unwrap());
         let end = parse(item.end_at.as_ref().unwrap());
 
-        assert!(start > now, "assignment must not be in the past: {item:?}");
+        assert!(
+            start >= optimized_at,
+            "assignment must not be in the past: {item:?}"
+        );
         assert!(start.time() >= chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap());
         assert!(end.time() <= chrono::NaiveTime::from_hms_opt(18, 0, 0).unwrap());
         assert!(start.date() == end.date(), "task must fit inside one day");
@@ -237,4 +242,50 @@ fn availability_far_out_in_the_horizon_is_still_reachable() {
         proposal.items[0].scheduled,
         "a single weekly window inside the horizon must stay schedulable"
     );
+}
+
+#[test]
+fn an_overloaded_inbox_schedules_what_fits_instead_of_nothing() {
+    let (_temp, conn, calendar_id) = connection();
+    let target = Utc::now()
+        .date_naive()
+        .checked_add_days(Days::new(1))
+        .unwrap();
+    let weekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        [target.weekday().num_days_from_monday() as usize];
+    update_settings(
+        &conn,
+        SettingsUpdate {
+            timezone: Some("UTC".into()),
+            availability: Some(Availability(BTreeMap::from([(
+                weekday.into(),
+                vec![TimeWindow {
+                    start: "09:00".into(),
+                    end: "11:00".into(),
+                }],
+            )]))),
+            solve_seconds: Some(1),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    // Two free hours, twenty one-hour tasks: two fit, the rest cannot.
+    for index in 0..20 {
+        create_task(&conn, task(calendar_id.clone(), &format!("Task {index}"))).unwrap();
+    }
+
+    let proposal = optimize(&conn, Some(3)).unwrap();
+    let scheduled: Vec<_> = proposal
+        .items
+        .iter()
+        .filter(|item| item.scheduled)
+        .collect();
+    assert_eq!(scheduled.len(), 2, "{:?}", proposal.items);
+    assert!(proposal
+        .proposal
+        .score
+        .as_deref()
+        .unwrap()
+        .starts_with("0hard"));
+    assert_ne!(scheduled[0].start_at, scheduled[1].start_at);
 }

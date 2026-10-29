@@ -4,8 +4,6 @@
 //! SolverForge runtime. It owns no scheduling policy: facts and tasks carry
 //! domain data, and every rule lives in `crate::planner::constraints`.
 
-use std::sync::LazyLock;
-
 use solverforge::{prelude::*, SolverConfig, SolverManager};
 
 use super::{
@@ -85,7 +83,7 @@ fn planner_solver_config(plan: &SolverPlan, config: SolverConfig) -> SolverConfi
 }
 
 /// Global retained solver manager, mirroring the reference apps.
-pub static PLANNER_MANAGER: LazyLock<SolverManager<SolverPlan>> = LazyLock::new(SolverManager::new);
+pub static PLANNER_MANAGER: SolverManager<SolverPlan> = SolverManager::new();
 
 #[cfg(test)]
 mod tests {
