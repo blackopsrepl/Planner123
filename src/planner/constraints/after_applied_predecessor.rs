@@ -1,5 +1,4 @@
-use super::support::{task_row, AppliedRows, TimelineRow};
-use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
+use crate::planner_domain::{SolverAppliedBlock, SolverPlan, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -8,43 +7,21 @@ use solverforge::IncrementalConstraint;
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
+        .filter(|task: &SolverTask| task.start_idx.is_some())
         .join((
-            SolverPlan::slots(),
-            joiner::equal_bi(
-                |task: &SolverTask| task.start_idx,
-                |slot: &SolverSlot| Some(slot.id),
+            SolverPlan::applied_blocks(),
+            joiner::less_than(
+                |task: &SolverTask| task.start(),
+                |block: &SolverAppliedBlock| Some(block.end),
             ),
         ))
-        .project(task_row)
-        .merge(
-            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::applied_blocks())
-                .project(AppliedRows),
-        )
-        .join(joiner::equal(|_: &TimelineRow| ()))
-        .filter(|left: &TimelineRow, right: &TimelineRow| violates(left, right))
-        .penalize(hard_weight(|_: &TimelineRow, _: &TimelineRow| {
+        .filter(|task: &SolverTask, block: &SolverAppliedBlock| {
+            block.successors.contains(&task.index)
+        })
+        .penalize(hard_weight(|_: &SolverTask, _: &SolverAppliedBlock| {
             HardMediumSoftScore::of_hard(1)
         }))
         .named("Start after applied predecessor")
-}
-
-fn violates(left: &TimelineRow, right: &TimelineRow) -> bool {
-    match (left, right) {
-        (
-            TimelineRow::Task(task),
-            TimelineRow::Applied {
-                end, successors, ..
-            },
-        )
-        | (
-            TimelineRow::Applied {
-                end, successors, ..
-            },
-            TimelineRow::Task(task),
-        ) => successors.contains(&task.index) && task.start < *end,
-        _ => false,
-    }
 }
 
 #[cfg(test)]

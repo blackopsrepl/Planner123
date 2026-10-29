@@ -29,6 +29,8 @@ pub fn task(priority_weight: i64, duration_minutes: i64) -> SolverTask {
         recovery_minutes: 60,
         excess_high_penalty: 5,
         high_streak_limit: 1,
+        grid_origin: origin(),
+        slot_minutes: 30,
         start_idx: None,
     }
 }

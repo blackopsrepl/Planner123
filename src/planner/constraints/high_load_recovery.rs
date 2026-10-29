@@ -1,5 +1,5 @@
 use super::support::TaskInterval;
-use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
+use crate::planner_domain::{SolverPlan, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -8,24 +8,13 @@ use solverforge::IncrementalConstraint;
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
-        .join((
-            SolverPlan::slots(),
-            joiner::equal_bi(
-                |task: &SolverTask| task.start_idx,
-                |slot: &SolverSlot| Some(slot.id),
-            ),
-        ))
-        .project(|task: &SolverTask, slot: &SolverSlot| TaskInterval::new(task, slot))
-        .filter(|interval: &TaskInterval| interval.is_high())
-        .group_by(
-            |_: &TaskInterval| (),
-            collect_vec(|interval: &TaskInterval| interval.clone()),
-        )
-        .penalize(|_: &(), intervals: &CollectedVec<TaskInterval>| {
+        .filter(|task: &SolverTask| task.load == 2 && task.start_idx.is_some())
+        .group_by(|_: &SolverTask| (), collect_vec(TaskInterval::of))
+        .penalize(|_: &(), intervals: &CollectedVec<Option<TaskInterval>>| {
+            let assigned = || intervals.iter().flatten();
             HardMediumSoftScore::of_soft(
-                intervals
-                    .iter()
-                    .map(|target| recovery_penalty(target, intervals.iter()))
+                assigned()
+                    .map(|target| recovery_penalty(target, assigned()))
                     .sum(),
             )
         })

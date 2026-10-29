@@ -1,4 +1,4 @@
-use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
+use crate::planner_domain::{SolverPlan, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -6,18 +6,12 @@ use solverforge::IncrementalConstraint;
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
-        .join((
-            SolverPlan::slots(),
-            joiner::equal_bi(
-                |task: &SolverTask| task.start_idx,
-                |slot: &SolverSlot| Some(slot.id),
-            ),
-        ))
-        .filter(|task: &SolverTask, slot: &SolverSlot| {
-            task.earliest_at
-                .is_some_and(|earliest| slot.start < earliest)
+        .filter(|task: &SolverTask| {
+            task.start()
+                .zip(task.earliest_at)
+                .is_some_and(|(start, earliest)| start < earliest)
         })
-        .penalize(hard_weight(|_: &SolverTask, _: &SolverSlot| {
+        .penalize(hard_weight(|_: &SolverTask| {
             HardMediumSoftScore::of_hard(1)
         }))
         .named("Respect earliest start")

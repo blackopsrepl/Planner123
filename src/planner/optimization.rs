@@ -93,22 +93,15 @@ pub fn optimize(
 
     let mut items = Vec::new();
     for task in &solved.tasks {
-        let selected = task.start_idx.and_then(|index| solved.slots.get(index));
+        // The persisted interval is the one every scoring rule saw.
+        let selected = task.start().zip(task.end());
+        let local = |at: DateTime<Utc>| {
+            at.with_timezone(&timezone)
+                .format(time::STORAGE_FORMAT)
+                .to_string()
+        };
         let (start_at, end_at) = match selected {
-            Some(slot) => (
-                Some(
-                    slot.start
-                        .with_timezone(&timezone)
-                        .format(time::STORAGE_FORMAT)
-                        .to_string(),
-                ),
-                Some(
-                    task.end_at(slot)
-                        .with_timezone(&timezone)
-                        .format(time::STORAGE_FORMAT)
-                        .to_string(),
-                ),
-            ),
+            Some((start, end)) => (Some(local(start)), Some(local(end))),
             None => (None, None),
         };
         let entry = &penalties[task.index];
@@ -163,14 +156,7 @@ struct TaskPenalties {
 /// scoring rules use, then proves the totals reconcile with the solver's own
 /// score analysis before anything is persisted.
 fn task_penalties(plan: &SolverPlan) -> Result<Vec<TaskPenalties>, PlannerError> {
-    let intervals: Vec<Option<TaskInterval>> = plan
-        .tasks
-        .iter()
-        .map(|task| {
-            task.start_idx
-                .map(|index| TaskInterval::new(task, &plan.slots[index]))
-        })
-        .collect();
+    let intervals: Vec<Option<TaskInterval>> = plan.tasks.iter().map(TaskInterval::of).collect();
 
     let mut penalties = vec![TaskPenalties::default(); plan.tasks.len()];
     for (index, interval) in intervals.iter().enumerate() {

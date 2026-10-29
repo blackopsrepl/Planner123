@@ -70,3 +70,21 @@ pub(super) fn overlaps(
 ) -> bool {
     a < d && c < b
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::planner_domain::test_support::{origin, task};
+
+    /// Tasks derive their interval from the grid geometry the loader copies
+    /// onto them; it must land on exactly the starts `make_slots` emits.
+    #[test]
+    fn task_grid_geometry_reproduces_every_slot_start() {
+        let slots = make_slots(origin(), origin() + Duration::days(2), 15).unwrap();
+        let mut task = task(1, 30);
+        task.slot_minutes = 15;
+        for slot in &slots {
+            assert_eq!(task.slot_start(slot.id), slot.start);
+        }
+    }
+}

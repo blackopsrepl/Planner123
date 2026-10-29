@@ -69,7 +69,14 @@ pub(super) fn build_plan(
     let applied_ends = applied_recovery_ends(&applied);
     let availability = availability_facts(inputs.availability)?;
     let cognitive = cognitive_facts(settings)?;
-    let tasks = build_tasks(inputs, now, horizon_end, &dependency_map, &applied_ends)?;
+    let tasks = build_tasks(
+        inputs,
+        now,
+        horizon_end,
+        origin,
+        &dependency_map,
+        &applied_ends,
+    )?;
     validate_soft_score_range(&tasks, &cognitive)?;
 
     Ok(BuiltPlan {
@@ -98,6 +105,7 @@ fn build_tasks(
     inputs: &SolverInputs<'_>,
     now: DateTime<Utc>,
     horizon_end: DateTime<Utc>,
+    grid_origin: DateTime<Utc>,
     dependency_map: &HashMap<String, Vec<usize>>,
     applied_ends: &[DateTime<Utc>],
 ) -> Result<Vec<SolverTask>, PlannerError> {
@@ -144,6 +152,8 @@ fn build_tasks(
                 recovery_minutes: settings.recovery_minutes,
                 excess_high_penalty: settings.excess_high_penalty,
                 high_streak_limit: settings.high_streak_limit,
+                grid_origin,
+                slot_minutes: settings.slot_minutes,
                 start_idx: None,
             })
         })

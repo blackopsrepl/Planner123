@@ -1,10 +1,6 @@
-use crate::planner_domain::{
-    SolverAppliedBlock, SolverAvailability, SolverBusy, SolverCognitiveWindow, SolverSlot,
-    SolverTask,
-};
-use chrono::{DateTime, NaiveTime, Utc};
+use crate::planner_domain::SolverTask;
+use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
-use solverforge::prelude::*;
 
 #[derive(Clone)]
 pub(crate) struct TaskInterval {
@@ -12,7 +8,6 @@ pub(crate) struct TaskInterval {
     pub(crate) start: DateTime<Utc>,
     pub(crate) end: DateTime<Utc>,
     pub(super) load: usize,
-    pub(super) depends_on: Vec<usize>,
     pub(super) timezone: Tz,
     pub(super) recovery_minutes: i64,
     pub(crate) excess_high_penalty: i64,
@@ -22,13 +17,19 @@ pub(crate) struct TaskInterval {
 }
 
 impl TaskInterval {
-    pub(crate) fn new(task: &SolverTask, slot: &SolverSlot) -> Self {
+    /// The task's interval when it is assigned.
+    pub(crate) fn of(task: &SolverTask) -> Option<Self> {
+        task.start().map(|start| Self::at(task, start))
+    }
+
+    /// The interval the task would occupy starting at `start`; proposal
+    /// diagnostics use it to probe candidate slots.
+    pub(crate) fn at(task: &SolverTask, start: DateTime<Utc>) -> Self {
         Self {
             index: task.index,
-            start: slot.start,
-            end: task.end_at(slot),
+            start,
+            end: task.end_from(start),
             load: task.load,
-            depends_on: task.depends_on.clone(),
             timezone: task.timezone,
             recovery_minutes: task.recovery_minutes,
             excess_high_penalty: task.excess_high_penalty,
@@ -67,115 +68,5 @@ impl TaskInterval {
             .iter()
             .filter(|end| self.gap_recovers(**end, true))
             .count()
-    }
-}
-
-#[derive(Clone)]
-pub(super) enum TimelineRow {
-    Task(TaskInterval),
-    Busy {
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-    },
-    Applied {
-        end: DateTime<Utc>,
-        successors: Vec<usize>,
-    },
-    Availability {
-        weekday: u32,
-        start: NaiveTime,
-        end: NaiveTime,
-    },
-    Cognitive {
-        load: usize,
-        start: NaiveTime,
-        end: NaiveTime,
-        outside_penalty: i64,
-    },
-}
-
-pub(super) fn task_row(task: &SolverTask, slot: &SolverSlot) -> TimelineRow {
-    TimelineRow::Task(TaskInterval::new(task, slot))
-}
-
-pub(super) struct BusyRows;
-
-impl Projection<SolverBusy> for BusyRows {
-    type Out = TimelineRow;
-    const MAX_EMITS: usize = 1;
-
-    fn project<Sink>(&self, busy: &SolverBusy, sink: &mut Sink)
-    where
-        Sink: ProjectionSink<Self::Out>,
-    {
-        sink.emit(TimelineRow::Busy {
-            start: busy.start,
-            end: busy.end,
-        });
-    }
-}
-
-pub(super) struct AppliedRows;
-
-impl Projection<SolverAppliedBlock> for AppliedRows {
-    type Out = TimelineRow;
-    const MAX_EMITS: usize = 1;
-
-    fn project<Sink>(&self, block: &SolverAppliedBlock, sink: &mut Sink)
-    where
-        Sink: ProjectionSink<Self::Out>,
-    {
-        sink.emit(TimelineRow::Applied {
-            end: block.end,
-            successors: block.successors.clone(),
-        });
-    }
-}
-
-pub(super) struct AvailabilityRows;
-
-impl Projection<SolverAvailability> for AvailabilityRows {
-    type Out = TimelineRow;
-    const MAX_EMITS: usize = 1;
-
-    fn project<Sink>(&self, window: &SolverAvailability, sink: &mut Sink)
-    where
-        Sink: ProjectionSink<Self::Out>,
-    {
-        sink.emit(TimelineRow::Availability {
-            weekday: window.weekday,
-            start: window.start,
-            end: window.end,
-        });
-    }
-}
-
-pub(super) struct CognitiveRows;
-
-impl Projection<SolverCognitiveWindow> for CognitiveRows {
-    type Out = TimelineRow;
-    const MAX_EMITS: usize = 1;
-
-    fn project<Sink>(&self, window: &SolverCognitiveWindow, sink: &mut Sink)
-    where
-        Sink: ProjectionSink<Self::Out>,
-    {
-        sink.emit(TimelineRow::Cognitive {
-            load: window.load,
-            start: window.start,
-            end: window.end,
-            outside_penalty: window.outside_penalty,
-        });
-    }
-}
-
-pub(super) fn clock_contains(value: NaiveTime, start: NaiveTime, end: NaiveTime) -> bool {
-    if start == end {
-        return true;
-    }
-    if start < end {
-        value >= start && value < end
-    } else {
-        value >= start || value < end
     }
 }

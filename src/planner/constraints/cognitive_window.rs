@@ -1,6 +1,7 @@
-use super::support::{clock_contains, task_row, CognitiveRows, TaskInterval, TimelineRow};
-use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
-use chrono::{Duration, NaiveTime};
+use super::clock::minutes_in_window;
+use super::support::TaskInterval;
+use crate::planner_domain::{SolverCognitiveWindow, SolverPlan, SolverTask};
+use chrono::NaiveTime;
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -9,48 +10,25 @@ use solverforge::IncrementalConstraint;
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
+        .filter(|task: &SolverTask| task.start_idx.is_some())
         .join((
-            SolverPlan::slots(),
+            SolverPlan::cognitive_windows(),
             joiner::equal_bi(
-                |task: &SolverTask| task.start_idx,
-                |slot: &SolverSlot| Some(slot.id),
+                |task: &SolverTask| task.load,
+                |window: &SolverCognitiveWindow| window.load,
             ),
         ))
-        .project(task_row)
-        .merge(
-            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::cognitive_windows())
-                .project(CognitiveRows),
-        )
-        .join(joiner::equal(|_: &TimelineRow| ()))
-        .filter(|left: &TimelineRow, right: &TimelineRow| penalty(left, right) > 0)
-        .penalize(|left: &TimelineRow, right: &TimelineRow| {
-            HardMediumSoftScore::of_soft(penalty(left, right))
+        .filter(|task: &SolverTask, window: &SolverCognitiveWindow| penalty(task, window) > 0)
+        .penalize(|task: &SolverTask, window: &SolverCognitiveWindow| {
+            HardMediumSoftScore::of_soft(penalty(task, window))
         })
         .named(super::names::COGNITIVE_WINDOWS)
 }
 
-fn penalty(left: &TimelineRow, right: &TimelineRow) -> i64 {
-    match (left, right) {
-        (
-            TimelineRow::Task(task),
-            TimelineRow::Cognitive {
-                load,
-                start,
-                end,
-                outside_penalty,
-            },
-        )
-        | (
-            TimelineRow::Cognitive {
-                load,
-                start,
-                end,
-                outside_penalty,
-            },
-            TimelineRow::Task(task),
-        ) if task.load == *load && *outside_penalty > 0 => {
-            minutes_outside(task, *start, *end) * *outside_penalty
+fn penalty(task: &SolverTask, window: &SolverCognitiveWindow) -> i64 {
+    match TaskInterval::of(task) {
+        Some(interval) if window.outside_penalty > 0 => {
+            minutes_outside(&interval, window.start, window.end) * window.outside_penalty
         }
         _ => 0,
     }
@@ -63,16 +41,16 @@ pub(crate) fn minutes_outside(
     window_start: NaiveTime,
     window_end: NaiveTime,
 ) -> i64 {
-    let mut cursor = task.start.with_timezone(&task.timezone);
-    let end = task.end.with_timezone(&task.timezone);
-    let mut outside = 0;
-    while cursor < end {
-        if !clock_contains(cursor.time(), window_start, window_end) {
-            outside += 1;
-        }
-        cursor += Duration::minutes(1);
-    }
-    outside
+    let duration = (task.end - task.start).num_minutes();
+    duration
+        - minutes_in_window(
+            task.start,
+            task.end,
+            task.timezone,
+            None,
+            window_start,
+            window_end,
+        )
 }
 
 #[cfg(test)]

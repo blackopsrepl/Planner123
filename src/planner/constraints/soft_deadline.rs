@@ -1,4 +1,4 @@
-use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
+use crate::planner_domain::{SolverPlan, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -9,24 +9,14 @@ use solverforge::IncrementalConstraint;
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
-        .join((
-            SolverPlan::slots(),
-            joiner::equal_bi(
-                |task: &SolverTask| task.start_idx,
-                |slot: &SolverSlot| Some(slot.id),
-            ),
-        ))
-        .filter(|task: &SolverTask, slot: &SolverSlot| late_minutes(task, slot) > 0)
-        .penalize(|task: &SolverTask, slot: &SolverSlot| {
-            HardMediumSoftScore::of_medium(late_minutes(task, slot))
-        })
+        .filter(|task: &SolverTask| late_minutes(task) > 0)
+        .penalize(|task: &SolverTask| HardMediumSoftScore::of_medium(late_minutes(task)))
         .named("Prefer soft deadlines")
 }
 
-fn late_minutes(task: &SolverTask, slot: &SolverSlot) -> i64 {
-    let end = task.end_at(slot);
-    match task.soft_deadline {
-        Some(deadline) if end > deadline => (end - deadline).num_minutes(),
+fn late_minutes(task: &SolverTask) -> i64 {
+    match task.end().zip(task.soft_deadline) {
+        Some((end, deadline)) if end > deadline => (end - deadline).num_minutes(),
         _ => 0,
     }
 }

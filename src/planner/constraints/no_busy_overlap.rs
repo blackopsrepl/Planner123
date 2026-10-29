@@ -1,41 +1,25 @@
-use super::support::{task_row, BusyRows, TimelineRow};
-use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
+use crate::planner_domain::{SolverBusy, SolverPlan, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
-/// HARD: a task must not overlap any existing event or applied block.
+/// HARD: a task must not overlap any existing event occurrence. Busy time is
+/// matched through an interval index on the task's `[start, end)`.
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
         .join((
-            SolverPlan::slots(),
-            joiner::equal_bi(
-                |task: &SolverTask| task.start_idx,
-                |slot: &SolverSlot| Some(slot.id),
+            SolverPlan::busy(),
+            joiner::overlapping(
+                |task: &SolverTask| task.start(),
+                |task: &SolverTask| task.end(),
+                |busy: &SolverBusy| Some(busy.start),
+                |busy: &SolverBusy| Some(busy.end),
             ),
         ))
-        .project(task_row)
-        .merge(
-            ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::busy())
-                .project(BusyRows),
-        )
-        .join(joiner::equal(|_: &TimelineRow| ()))
-        .filter(|left: &TimelineRow, right: &TimelineRow| task_overlaps_busy(left, right))
-        .penalize(hard_weight(|_: &TimelineRow, _: &TimelineRow| {
+        .penalize(hard_weight(|_: &SolverTask, _: &SolverBusy| {
             HardMediumSoftScore::of_hard(1)
         }))
         .named("No overlap with existing busy time")
-}
-
-fn task_overlaps_busy(left: &TimelineRow, right: &TimelineRow) -> bool {
-    match (left, right) {
-        (TimelineRow::Task(task), TimelineRow::Busy { start, end })
-        | (TimelineRow::Busy { start, end }, TimelineRow::Task(task)) => {
-            task.overlaps(*start, *end)
-        }
-        _ => false,
-    }
 }
 
 #[cfg(test)]

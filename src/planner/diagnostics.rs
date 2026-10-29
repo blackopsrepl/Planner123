@@ -39,7 +39,7 @@ pub(super) fn classify(
     }
     let mut blocked_by: Vec<&SolverBusy> = Vec::new();
     for slot in &plan.slots {
-        let interval = TaskInterval::new(task, slot);
+        let interval = TaskInterval::at(task, slot.start);
         if !hard_feasible_ignoring_busy(plan, horizon_end, task_index, &interval) {
             continue;
         }
@@ -88,7 +88,7 @@ fn has_individual_hard_slot(
 ) -> bool {
     let task = &plan.tasks[task_index];
     plan.slots.iter().any(|slot| {
-        let interval = TaskInterval::new(task, slot);
+        let interval = TaskInterval::at(task, slot.start);
         hard_feasible_ignoring_busy(plan, horizon_end, task_index, &interval)
             && plan
                 .busy

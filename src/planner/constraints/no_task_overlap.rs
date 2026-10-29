@@ -1,30 +1,23 @@
-use super::support::{task_row, TimelineRow};
-use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
+use crate::planner_domain::{SolverPlan, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
-/// HARD: two tasks must not occupy overlapping time.
+/// HARD: two tasks must not occupy overlapping time. Pairs are found through
+/// an interval index and counted once, as `(lower index, higher index)`.
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
         .join((
-            SolverPlan::slots(),
-            joiner::equal_bi(
-                |task: &SolverTask| task.start_idx,
-                |slot: &SolverSlot| Some(slot.id),
+            SolverPlan::tasks(),
+            joiner::overlapping(
+                |task: &SolverTask| task.start(),
+                |task: &SolverTask| task.end(),
+                |task: &SolverTask| task.start(),
+                |task: &SolverTask| task.end(),
             ),
         ))
-        .project(task_row)
-        .join(joiner::equal(|_: &TimelineRow| ()))
-        .filter(
-            |left: &TimelineRow, right: &TimelineRow| match (left, right) {
-                (TimelineRow::Task(left), TimelineRow::Task(right)) => {
-                    left.start < right.end && right.start < left.end
-                }
-                _ => false,
-            },
-        )
-        .penalize(hard_weight(|_: &TimelineRow, _: &TimelineRow| {
+        .filter(|left: &SolverTask, right: &SolverTask| left.index < right.index)
+        .penalize(hard_weight(|_: &SolverTask, _: &SolverTask| {
             HardMediumSoftScore::of_hard(1)
         }))
         .named("No overlap between inbox tasks")

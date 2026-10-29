@@ -1,6 +1,6 @@
-use super::support::{clock_contains, task_row, AvailabilityRows, TaskInterval, TimelineRow};
-use crate::planner_domain::{SolverAvailability, SolverPlan, SolverSlot, SolverTask};
-use chrono::{Datelike, Duration};
+use super::clock::minutes_in_window;
+use super::support::TaskInterval;
+use crate::planner_domain::{SolverAvailability, SolverPlan, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -21,47 +21,24 @@ pub fn required() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore>
 pub fn covered() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
+        .filter(|task: &SolverTask| task.start_idx.is_some())
         .join((
-            SolverPlan::slots(),
-            joiner::equal_bi(
-                |task: &SolverTask| task.start_idx,
-                |slot: &SolverSlot| Some(slot.id),
-            ),
-        ))
-        .project(task_row)
-        .merge(
             ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
-                .for_each(SolverPlan::availability())
-                .project(AvailabilityRows),
-        )
-        .join(joiner::equal(|_: &TimelineRow| ()))
-        .filter(|left: &TimelineRow, right: &TimelineRow| covered_minutes(left, right) > 0)
-        .reward(hard_weight(|left: &TimelineRow, right: &TimelineRow| {
-            HardMediumSoftScore::of_hard(covered_minutes(left, right))
-        }))
+                .for_each(SolverPlan::availability()),
+            |task: &SolverTask, window: &SolverAvailability| covered_minutes(task, window) > 0,
+        ))
+        .reward(hard_weight(
+            |task: &SolverTask, window: &SolverAvailability| {
+                HardMediumSoftScore::of_hard(covered_minutes(task, window))
+            },
+        ))
         .named("Cover available minutes")
 }
 
-fn covered_minutes(left: &TimelineRow, right: &TimelineRow) -> i64 {
-    match (left, right) {
-        (
-            TimelineRow::Task(task),
-            TimelineRow::Availability {
-                weekday,
-                start,
-                end,
-            },
-        )
-        | (
-            TimelineRow::Availability {
-                weekday,
-                start,
-                end,
-            },
-            TimelineRow::Task(task),
-        ) => task_covered_minutes(task, *weekday, *start, *end),
-        _ => 0,
-    }
+fn covered_minutes(task: &SolverTask, window: &SolverAvailability) -> i64 {
+    TaskInterval::of(task).map_or(0, |interval| {
+        task_covered_minutes(&interval, window.weekday, window.start, window.end)
+    })
 }
 
 /// Whether every minute of the interval lies inside the canonical availability
@@ -82,15 +59,14 @@ fn task_covered_minutes(
     window_start: chrono::NaiveTime,
     window_end: chrono::NaiveTime,
 ) -> i64 {
-    let duration = (task.end - task.start).num_minutes();
-    (0..duration)
-        .filter(|offset| {
-            let instant = task.start + Duration::minutes(*offset);
-            let local = instant.with_timezone(&task.timezone);
-            local.weekday().num_days_from_monday() == weekday
-                && clock_contains(local.time(), window_start, window_end)
-        })
-        .count() as i64
+    minutes_in_window(
+        task.start,
+        task.end,
+        task.timezone,
+        Some(weekday),
+        window_start,
+        window_end,
+    )
 }
 
 #[cfg(test)]

@@ -24,6 +24,7 @@ pub(crate) mod names {
 
 mod assign_priority;
 mod support;
+mod clock;
 mod future_only;
 mod respect_earliest;
 mod respect_hard_deadline;

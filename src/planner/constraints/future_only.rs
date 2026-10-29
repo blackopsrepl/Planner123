@@ -1,4 +1,4 @@
-use crate::planner_domain::{SolverPlan, SolverSlot, SolverTask};
+use crate::planner_domain::{SolverPlan, SolverTask};
 use solverforge::prelude::*;
 use solverforge::IncrementalConstraint;
 
@@ -6,15 +6,8 @@ use solverforge::IncrementalConstraint;
 pub fn constraint() -> impl IncrementalConstraint<SolverPlan, HardMediumSoftScore> {
     ConstraintFactory::<SolverPlan, HardMediumSoftScore>::new()
         .for_each(SolverPlan::tasks())
-        .join((
-            SolverPlan::slots(),
-            joiner::equal_bi(
-                |task: &SolverTask| task.start_idx,
-                |slot: &SolverSlot| Some(slot.id),
-            ),
-        ))
-        .filter(|task: &SolverTask, slot: &SolverSlot| slot.start < task.not_before)
-        .penalize(hard_weight(|_: &SolverTask, _: &SolverSlot| {
+        .filter(|task: &SolverTask| task.start().is_some_and(|start| start < task.not_before))
+        .penalize(hard_weight(|_: &SolverTask| {
             HardMediumSoftScore::of_hard(1)
         }))
         .named("Never schedule in the past")
