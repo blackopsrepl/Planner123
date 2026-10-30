@@ -43,7 +43,7 @@ Use glyphfx for text-oriented effects; custom Rust layers for the demo's starfie
 
 There is an existing in-process precedent: `hammer_05/csrc/gfx_shim.c:30` opens an effect, `:66` steps it, and `hammer_05/src/gfx.rs:129` decodes frames. Reuse the approach, not the demo's whole implementation:
 
-1. Pin/vendor the C engine with its MIT license and NOTICE; build a static bridge, not an external executable dependency. Add the Rust build dependency explicitly.
+1. Keep the C engine and its build/unsafe boundary in reusable `glyphfx-sys` and safe `glyphfx` Rust crates maintained in the glyphfx repository. Planner123 consumes a pinned Rust dependency and a safe ratatui adapter; it carries no vendored C tree, C build script, or unsafe code. Preserve the engine's MIT license and NOTICE in its own package.
 2. Wrap creation/stepping/destruction behind a safe Rust owner. Step on demand; never pre-render every frame at startup as Hammer does.
 3. Composite into a bounded ratatui scratch buffer. Ratatui alone owns stdout, cursor, alternate screen and terminal restoration. Do not pipe glyphfx ANSI directly to the terminal.
 4. The present frame interface returns ANSI strings, not ratatui cells. First spike must verify bounded decoding, background/style preservation, Unicode widths, terminal row orientation, cancellation, and exact final-frame restoration. Hammer's parser counts chars as columns and retains only foreground; it is not production-ready for arbitrary calendar text.

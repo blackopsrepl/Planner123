@@ -7,6 +7,10 @@ description = "Planner123 — a spiffy ratatui TUI calendar — local SQLite + G
 default-run = "planner123"
 
 [dependencies]
+# Text effects; the C engine and all unsafe code live in glyphfx's own crates.
+# Pinned to blackopsrepl/glyphfx#2 until glyphfx publishes to crates.io.
+glyphfx = { git = "https://github.com/blackopsrepl/glyphfx", rev = "2b4be1e19babb9f039f3b5f6b8ab20005ebe692a" }
+vte = "0.15"
 # TUI
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
 crossterm = "0.28"
@@ -52,6 +56,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # Utilities
 dirs = "6"
 unicode-width = "0.2"
+unicode-segmentation = "1.12"
 open = "5"
 reqwest = { version = "0.12", features = ["json"] }
 base64 = "0.22"

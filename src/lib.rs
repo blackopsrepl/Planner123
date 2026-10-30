@@ -7,6 +7,7 @@ pub mod dag;
 pub mod db;
 pub mod event;
 pub mod event_service;
+pub mod glyphfx;
 pub mod google;
 pub mod ical;
 pub mod keys;

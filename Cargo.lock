@@ -94,6 +94,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e0fee31ef5ed1ba1316088939cea399010ed7731dba877ed44aeb407a75ea"
 
 [[package]]
+name = "arrayvec"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
+
+[[package]]
 name = "assert_cmd"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -357,6 +363,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aebf35691d1bfb0ac386a69bac2fde4dd276fb618cf8bf4f5318fe285e821bb2"
 dependencies = [
  "find-msvc-tools",
+ "jobserver",
+ "libc",
  "shlex",
 ]
 
@@ -1022,6 +1030,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "glyphfx"
+version = "0.1.0"
+source = "git+https://github.com/blackopsrepl/glyphfx?rev=2b4be1e19babb9f039f3b5f6b8ab20005ebe692a#2b4be1e19babb9f039f3b5f6b8ab20005ebe692a"
+dependencies = [
+ "glyphfx-sys",
+]
+
+[[package]]
+name = "glyphfx-sys"
+version = "0.1.0"
+source = "git+https://github.com/blackopsrepl/glyphfx?rev=2b4be1e19babb9f039f3b5f6b8ab20005ebe692a#2b4be1e19babb9f039f3b5f6b8ab20005ebe692a"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "google-apis-common"
 version = "8.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1549,6 +1573,16 @@ name = "itoa"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+
+[[package]]
+name = "jobserver"
+version = "0.1.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c00acbd29eabad4a2392fa0e921c874934dbbf4194312ad20f04a0ed67a3cb3"
+dependencies = [
+ "getrandom 0.4.1",
+ "libc",
+]
 
 [[package]]
 name = "js-sys"
@@ -2079,6 +2113,7 @@ dependencies = [
  "clap",
  "crossterm",
  "dirs",
+ "glyphfx",
  "google-calendar3",
  "iana-time-zone",
  "icalendar",
@@ -2097,8 +2132,10 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml 0.8.23",
+ "unicode-segmentation",
  "unicode-width 0.2.0",
  "uuid",
+ "vte",
 ]
 
 [[package]]
@@ -3552,6 +3589,16 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vte"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5924018406ce0063cd67f8e008104968b74b563ee1b85dde3ed1f7cb87d3dbd"
+dependencies = [
+ "arrayvec",
+ "memchr",
+]
 
 [[package]]
 name = "wait-timeout"
