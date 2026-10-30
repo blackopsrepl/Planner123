@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.10](https://github.com/blackopsrepl/Planner123/compare/v0.6.9...v0.6.10) (2026-10-30)
+
+
+### Bug Fixes
+
+* **effects:** drop the background layers from calendar views ([2de51c1](https://github.com/blackopsrepl/Planner123/commit/2de51c1bd46f6f8ffbed37191f2e5f8ad1d6c43d))
+
+
 ## [0.6.9](https://github.com/blackopsrepl/Planner123/compare/v0.6.8...v0.6.9) (2026-10-30)
 
 
