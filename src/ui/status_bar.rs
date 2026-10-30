@@ -150,7 +150,14 @@ pub fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
         }
         None => {
             for (key, desc) in crate::keys::hints_within(&app.view, budget) {
-                spans.push(Span::styled(format!(" {} ", key), t.status_key()));
+                spans.push(Span::styled(
+                    format!(" {} ", key),
+                    if app.effects.pressed(&app.view, key, desc) {
+                        t.selected()
+                    } else {
+                        t.status_key()
+                    },
+                ));
                 spans.push(Span::styled(format!(" {} ", desc), t.status_desc()));
                 spans.push(Span::styled("  ", t.status_bar()));
             }

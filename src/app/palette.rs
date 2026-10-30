@@ -10,7 +10,7 @@ would use, so a palette command can never do something a key cannot. */
 
 /* One palette entry. */
 pub struct Command {
-    pub label: &'static str,
+    pub label: std::borrow::Cow<'static, str>,
     pub action: Action,
 }
 
@@ -18,79 +18,79 @@ pub struct Command {
 pub fn commands() -> Vec<Command> {
     vec![
         Command {
-            label: "Go to date…",
+            label: "Go to date…".into(),
             action: Action::JumpToDate,
         },
         Command {
-            label: "Go to today",
+            label: "Go to today".into(),
             action: Action::JumpToday,
         },
         Command {
-            label: "Month view",
+            label: "Month view".into(),
             action: Action::ViewMonth,
         },
         Command {
-            label: "Week view",
+            label: "Week view".into(),
             action: Action::ViewWeek,
         },
         Command {
-            label: "Day view",
+            label: "Day view".into(),
             action: Action::ViewDay,
         },
         Command {
-            label: "Agenda view",
+            label: "Agenda view".into(),
             action: Action::ViewAgenda,
         },
         Command {
-            label: "New event",
+            label: "New event".into(),
             action: Action::CreateEvent,
         },
         Command {
-            label: "Quick add event",
+            label: "Quick add event".into(),
             action: Action::QuickAdd,
         },
         Command {
-            label: "Planner inbox",
+            label: "Planner inbox".into(),
             action: Action::PlannerInbox,
         },
         Command {
-            label: "Planner settings",
+            label: "Planner settings".into(),
             action: Action::PlannerSettings,
         },
         Command {
-            label: "Sync with Google Calendar",
+            label: "Sync with Google Calendar".into(),
             action: Action::GoogleSync,
         },
         Command {
-            label: "Google account and calendars",
+            label: "Google account and calendars".into(),
             action: Action::GoogleManage,
         },
         Command {
-            label: "Sign in to Google",
+            label: "Sign in to Google".into(),
             action: Action::GoogleLogin,
         },
         Command {
-            label: "Sign out of Google",
+            label: "Sign out of Google".into(),
             action: Action::GoogleAuthLogout,
         },
         Command {
-            label: "Discover Google calendars",
+            label: "Discover Google calendars".into(),
             action: Action::GoogleDiscoverCalendars,
         },
         Command {
-            label: "Import .ics file",
+            label: "Import .ics file".into(),
             action: Action::ImportIcal,
         },
         Command {
-            label: "Export .ics file",
+            label: "Export .ics file".into(),
             action: Action::ExportIcal,
         },
         Command {
-            label: "Toggle selected calendar",
+            label: "Toggle selected calendar".into(),
             action: Action::ToggleCalendar,
         },
         Command {
-            label: "Quit",
+            label: "Quit".into(),
             action: Action::Quit,
         },
     ]
@@ -98,6 +98,7 @@ pub fn commands() -> Vec<Command> {
 
 impl App {
     pub(super) fn open_palette(&mut self) {
+        self.palette_origin = self.view.clone();
         self.palette_input.clear();
         self.palette_index = 0;
         self.view = View::Palette;
@@ -107,7 +108,8 @@ impl App {
     pub fn palette_matches(&self) -> Vec<Command> {
         commands()
             .into_iter()
-            .filter(|command| fuzzy_match(&self.palette_input, command.label))
+            .chain(self.effect_commands())
+            .filter(|command| fuzzy_match(&self.palette_input, &command.label))
             .collect()
     }
 
@@ -137,7 +139,11 @@ impl App {
             return;
         };
         let action = command.action;
-        let return_view = self.return_view.clone();
+        let return_view = if matches!(action, Action::ToggleEffect(_) | Action::Credits) {
+            self.palette_origin.clone()
+        } else {
+            self.return_view.clone()
+        };
         self.switch_view(return_view);
         self.dispatch(action);
     }

@@ -35,6 +35,7 @@ pub fn render_agenda(app: &App, frame: &mut Frame, area: Rect) {
     // Show the next 60 days
     let mut prev_date: Option<NaiveDate> = None;
     let mut event_count = 0;
+    let mut landings = Vec::new();
 
     for ev in &visible_events {
         let date = if let Some(dt) = ev.start_local_dt() {
@@ -98,6 +99,8 @@ pub fn render_agenda(app: &App, frame: &mut Frame, area: Rect) {
 
         let title_style = if is_selected {
             t.event_selected()
+        } else if app.applied_event_style(&ev.id) {
+            t.accent_style()
         } else {
             t.normal()
         };
@@ -129,6 +132,9 @@ pub fn render_agenda(app: &App, frame: &mut Frame, area: Rect) {
         }
 
         lines.push(Line::from(spans));
+        if app.effects.applied_ids.contains(&ev.id) {
+            landings.push((lines.len() - 1, ev.id.clone()));
+        }
         event_count += 1;
     }
 
@@ -146,6 +152,13 @@ pub fn render_agenda(app: &App, frame: &mut Frame, area: Rect) {
         ]));
     }
 
-    let para = Paragraph::new(lines).scroll((app.agenda_scroll, 0));
+    let para = Paragraph::new(lines).scroll((app.effects.scroll_position(app.agenda_scroll), 0));
     frame.render_widget(para, inner);
+    let scroll = app.effects.scroll_position(app.agenda_scroll) as usize;
+    for (row, id) in landings {
+        if row >= scroll && row - scroll < inner.height as usize {
+            let target = Rect::new(inner.x, inner.y + (row - scroll) as u16, inner.width, 1);
+            super::success_accent::render(app, frame, target, Some(&id), inner);
+        }
+    }
 }

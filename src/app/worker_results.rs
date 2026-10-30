@@ -40,6 +40,7 @@ impl App {
                 self.event_window = Some((start, end));
                 self.occurrences = crate::recurrence::occurrences_between(&events, start, end);
                 self.events = events.clone();
+                self.events_loaded_effect();
                 // Update shared arc for notification task
                 let arc = self.events_arc.clone();
                 tokio::spawn(async move {
@@ -76,14 +77,17 @@ impl App {
                 self.loading = false;
             }
             WorkerResult::PlannerProposalReady(proposal) => {
+                self.proposal_ready_effect();
                 self.planner_proposal = Some(proposal);
                 self.loading = false;
                 self.set_status(
-                    "Planner proposal is ready for review; press a to apply.",
+                    "Planner proposal is ready for review; press A to apply.",
                     false,
                 );
+                self.reload_events_if_needed();
             }
             WorkerResult::PlannerProposalApplied(proposal) => {
+                self.proposal_applied_effect(&proposal.proposal.id);
                 self.planner_proposal = Some(proposal);
                 self.worker.load_planner_tasks();
                 self.reload_events();
@@ -91,11 +95,13 @@ impl App {
                 self.set_status("Scheduled planner tasks were applied.", false);
             }
             WorkerResult::EventDeleted(id) => {
+                self.invalidate_proposal();
                 self.events.retain(|e| e.id != id);
                 self.occurrences.retain(|e| e.id != id);
                 self.set_status("Event deleted.", false);
             }
             WorkerResult::EventSaved(ev) => {
+                self.invalidate_proposal();
                 // Refresh events for the view the form was opened from.
                 self.view = self.return_view.clone();
                 self.sidebar_focused = false;
@@ -127,6 +133,7 @@ impl App {
                 events_updated,
                 conflicts_detected,
             } => {
+                self.invalidate_proposal();
                 self.reload_events();
                 self.worker.load_calendar_sync_states();
                 let (status, is_error) = google_sync_finished_status(
@@ -140,6 +147,7 @@ impl App {
                 self.loading = false;
             }
             WorkerResult::IcalImported(report) => {
+                self.invalidate_proposal();
                 // Enter the month grid before the refresh below: the requested
                 // window is derived from the current view, so reloading first
                 // would fetch the range of the view being left behind and skip
@@ -166,6 +174,16 @@ impl App {
                 self.loading = false;
             }
             WorkerResult::Error(e) => {
+                self.effects.pending_ids.clear();
+                self.effects.proposal = None;
+                self.effects.applied = None;
+                if self
+                    .planner_proposal
+                    .as_ref()
+                    .is_some_and(|p| p.proposal.status == "ready")
+                {
+                    self.planner_proposal = None;
+                }
                 self.set_status(e, true);
                 self.loading = false;
             }

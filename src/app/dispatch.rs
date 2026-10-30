@@ -1,6 +1,10 @@
 use super::*;
 impl App {
     pub fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
+        if self.effects.credits {
+            self.credits_key(key);
+            return;
+        }
         /* An armed confirmation owns this keystroke: `y` commits, anything else
         cancels. Nothing is resolved, so no other key can be the one that
         deletes an event. */
@@ -57,7 +61,19 @@ impl App {
     }
 
     pub fn dispatch(&mut self, action: Action) {
+        self.effects.chip = Some((action.clone(), std::time::Instant::now()));
+        let previous_scroll = self.agenda_scroll;
+        if matches!(action, Action::FormSubmit)
+            && matches!(self.view, View::PlannerTaskForm | View::PlannerSettingsForm)
+        {
+            self.invalidate_proposal();
+        }
         match action {
+            Action::ToggleEffect(name) => self.toggle_effect(&name),
+            Action::Credits => {
+                self.effects.credits = true;
+                self.effects.cancel();
+            }
             Action::Quit => self.running = false,
             Action::Help => {
                 // The overlay opens with the current surface's keys at the top;
@@ -231,6 +247,8 @@ impl App {
                     self.open_planner_settings_form();
                     return;
                 }
+                self.planner_proposal = None;
+                self.effects.cancel();
                 self.loading = true;
                 self.worker.optimize_planner();
             }
@@ -252,6 +270,9 @@ impl App {
             Action::JumpToDate => self.open_date_jump(),
 
             Action::None => {}
+        }
+        if previous_scroll != self.agenda_scroll {
+            self.effects.scroll_to(previous_scroll, self.agenda_scroll);
         }
     }
 

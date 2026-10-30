@@ -91,47 +91,7 @@ pub fn render_inbox(app: &App, frame: &mut Frame, area: Rect) {
         ),
         task_detail_area,
     );
-    let proposal = match &app.planner_proposal {
-        Some(detail) => {
-            let scheduled = detail.items.iter().filter(|item| item.scheduled).count();
-            let lines = detail
-                .items
-                .iter()
-                .take(5)
-                .map(|item| {
-                    let when = item.start_at.as_deref().unwrap_or("unscheduled");
-                    Line::from(format!(
-                        "{}  {}",
-                        when,
-                        item.explanation.as_deref().unwrap_or("scheduled")
-                    ))
-                })
-                .collect::<Vec<_>>();
-            let mut text = vec![Line::from(format!(
-                "Proposal {}: {scheduled}/{} scheduled",
-                &detail.proposal.id[..8],
-                detail.items.len()
-            ))];
-            text.push(Line::from(if detail.proposal.status == "ready" {
-                "Press A to apply this reviewed proposal."
-            } else {
-                "This proposal has already been applied."
-            }));
-            text.extend(lines);
-            text
-        }
-        None => vec![Line::from(
-            "No proposal yet. Press s to configure Planner Settings, then press o.",
-        )],
-    };
-    frame.render_widget(
-        Paragraph::new(proposal).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" Planner123 Proposal "),
-        ),
-        proposal_area,
-    );
+    super::proposal_preview::render(app, frame, proposal_area);
 }
 
 pub fn render_settings_form(app: &App, frame: &mut Frame) {

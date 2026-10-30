@@ -57,6 +57,7 @@ impl FormField {
 
 pub struct App {
     pub running: bool,
+    pub effects: crate::effects::Effects,
     pub view: View,
 
     // ── Calendar navigation ─────────────────────────────────────
@@ -142,6 +143,7 @@ pub struct App {
 
     // ── Command palette + go to date ──────────────────────────────
     pub palette_input: String,
+    pub palette_origin: View,
     pub palette_index: usize,
     pub date_jump_input: String,
 
@@ -187,6 +189,7 @@ impl App {
 
         let mut app = Self {
             running: true,
+            effects: crate::effects::Effects::default(),
             view: View::Month,
             focused_date: today,
             view_month: today.month(),
@@ -246,6 +249,7 @@ impl App {
             ical_import_field_index: 0,
             quick_add_input: String::new(),
             palette_input: String::new(),
+            palette_origin: View::Month,
             palette_index: 0,
             date_jump_input: String::new(),
             agenda_scroll: 0,

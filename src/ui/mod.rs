@@ -25,8 +25,10 @@ pub mod ical_import;
 pub mod month_view;
 pub mod palette;
 pub mod planner;
+mod proposal_preview;
 pub mod quick_add;
 pub mod status_bar;
+mod success_accent;
 pub mod time_grid;
 pub mod util;
 pub mod week_view;
@@ -41,6 +43,7 @@ use crate::keys::View;
 
 /* Render the entire application for the current frame. */
 pub fn render(app: &mut App, frame: &mut Frame) {
+    app.effects.prepare(&app.view, frame.area());
     let [header_area, body_area, status_area] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Fill(1),
@@ -50,6 +53,12 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     // ── Header bar ───────────────────────────────────────────────
     status_bar::render_header(app, frame, header_area);
+    crate::effects::brand::render(&mut app.effects, &app.view, frame, header_area);
+    if !app.effects.credits && !app.status_is_error {
+        if let Some(diagnostic) = app.effects.diagnostic.take() {
+            app.set_status(diagnostic, false);
+        }
+    }
 
     // ── Main body: sidebar (22 cols) + content (fill) ────────────
     let sidebar_width = 22u16;
@@ -98,6 +107,8 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         View::PlannerSettingsForm => planner::render_inbox(app, frame, content_area),
     }
 
+    crate::effects::layers::composite(&app.effects, &app.view, frame.buffer_mut(), content_area);
+
     // ── Status / bottom bar ──────────────────────────────────────
     match &app.view {
         View::QuickAdd => quick_add::render_quick_add(app, frame, status_area),
@@ -105,6 +116,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         _ => status_bar::render_status_bar(app, frame, status_area),
     }
 
+    if app.effects.credits {
+        crate::effects::credits::render(&mut app.effects, frame, body_area);
+        return;
+    }
     // ── Overlays (rendered on top of everything) ─────────────────
     match &app.view {
         View::EventForm => event_form::render_event_form(app, frame),

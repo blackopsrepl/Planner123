@@ -7,7 +7,32 @@ out of the keymap. */
 
 use crate::keys::Hint;
 
-use super::Context;
+use super::{Action, Context};
+
+/// Grouped chips (j/k, h/l, PgUp/PgDn) live on their leading registry row.
+/// Resolve the companion action here, beside that registry, not in a renderer.
+pub fn action_hint(context: Context, action: &Action) -> Option<Hint> {
+    let rows = super::rows(context);
+    let row = rows.iter().find(|row| &row.action == action)?;
+    if let Some(hint) = row.bar {
+        return Some((hint.key, hint.label));
+    }
+    let companion = match action {
+        Action::NextUnit => Action::PrevUnit,
+        Action::NextDay => Action::PrevDay,
+        Action::NextPeriod => Action::PrevPeriod,
+        Action::ScrollDown => Action::ScrollUp,
+        Action::ScrollPageDown => Action::ScrollPageUp,
+        Action::CalendarDown => Action::CalendarUp,
+        Action::PaletteDown => Action::PaletteUp,
+        Action::FormPrevField => Action::FormNextField,
+        _ => return None,
+    };
+    rows.iter()
+        .find(|row| row.action == companion)
+        .and_then(|row| row.bar)
+        .map(|hint| (hint.key, hint.label))
+}
 
 /* Width of a rendered chip: " key " + " label " + 2 columns of gap. */
 pub fn hint_width(hint: &Hint) -> usize {

@@ -69,7 +69,7 @@ impl App {
             View::Agenda => {
                 self.agenda_scroll = self.agenda_scroll.saturating_add(1);
             }
-            View::PlannerInbox if self.planner_selected_index + 1 < self.planner_tasks.len() => {
+            View::PlannerInbox if self.planner_selected_index + 1 < self.planner_row_count() => {
                 self.planner_selected_index += 1;
             }
             _ => {}
@@ -154,6 +154,21 @@ impl App {
                 (start, start + Duration::days(6))
             }
             View::Day => (self.focused_date, self.focused_date),
+            View::PlannerInbox => {
+                let (start, end) = Self::month_grid(self.view_year, self.view_month);
+                let horizon = self.planner_proposal.as_ref().and_then(|p| {
+                    let at = NaiveDateTime::parse_from_str(
+                        &p.proposal.horizon_start,
+                        crate::time::STORAGE_FORMAT,
+                    )
+                    .ok()?
+                    .date();
+                    let last =
+                        at.checked_add_signed(Duration::days(p.proposal.horizon_days + 1))?;
+                    Some((start.min(at - Duration::days(1)), end.max(last)))
+                });
+                horizon.unwrap_or((start, end))
+            }
             _ => Self::month_grid(self.view_year, self.view_month),
         }
     }

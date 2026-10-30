@@ -217,4 +217,16 @@ fn render_day_cell(
 
     let para = Paragraph::new(lines);
     frame.render_widget(para, inner);
+    if let Some(event) = events
+        .iter()
+        .find(|e| app.effects.applied_ids.contains(&e.id))
+    {
+        let target = Rect::new(
+            inner.x,
+            inner.y + 1,
+            inner.width,
+            inner.height.saturating_sub(1),
+        );
+        super::success_accent::render(app, frame, target, Some(&event.id), inner);
+    }
 }

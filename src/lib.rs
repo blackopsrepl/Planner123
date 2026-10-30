@@ -5,6 +5,7 @@ pub mod calendar_service;
 pub mod cli;
 pub mod dag;
 pub mod db;
+pub mod effects;
 pub mod event;
 pub mod event_service;
 pub mod glyphfx;

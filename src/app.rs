@@ -14,6 +14,7 @@ use crate::worker::{Worker, WorkerResult};
 
 mod confirm;
 mod dispatch;
+mod effects;
 mod event_form;
 mod integrations;
 mod navigation;

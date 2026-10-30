@@ -20,7 +20,7 @@ mod key;
 mod overlays;
 mod sections;
 
-pub use chips::{bar_hints, bar_hints_within, hint_width};
+pub use chips::{action_hint, bar_hints, bar_hints_within, hint_width};
 pub use key::Key;
 pub use sections::{help_sections, help_sections_for, section_of, Section};
 

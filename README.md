@@ -55,6 +55,35 @@ Press `1`–`4` to switch views:
 
 ![Week view with time grid](assets/screenshot-week.png)
 
+### Native terminal effects
+
+Effects are on by default: subtle month plasma, week/day copper, agenda parallax
+stars, eased manual agenda scrolling, pressed key chips, and short entry wipes.
+Calendar text, selection and popups remain readable; decorations never change
+events, move the actual clock, scroll automatically, or delay a worker operation.
+
+Open `:` and search **Effects: all** for the master switch, or **Effect:** for
+individual switches (including every glyphfx effect). Each command shows its
+current ON/OFF value. Preferences are saved atomically to
+`$XDG_CONFIG_HOME/planner123/effects.json` (normally
+`~/.config/planner123/effects.json`). Master-off stops animation-only redraws
+and leaves the complete calendar and proposal UI in place.
+
+The planner proposal includes a read-only, overlap-aware time-grid preview.
+Dashed rails mean proposed, not saved; `j`/`k` inspect task details and anchor
+the preview to that task's proposed slot. Task labels fly only to visible real
+slots. `A` still performs the normal transactional apply immediately. Success
+sweeps and landing ripples start only after a successful commit and a calendar
+reload containing its exact linked event IDs. Rejected or invalidated proposals
+do not leave a ghost schedule behind.
+
+Palette **Credits and glyphfx gallery** opens the terminal sine scroller,
+braille ouroboros and automatically playing glyphfx gallery. All 37 effects are
+enabled by default here; disabled effects are skipped. Use `←`/`→` to browse,
+`Esc` to return. The gallery never opens automatically at startup. Glyphfx runs
+through a safe Rust adapter into bounded terminal buffers, never directly onto
+stdout; resizing or cancelling restores the canonical interface.
+
 ### Working with events
 
 - `c` creates an event on the selected day (title, time, calendar, location,

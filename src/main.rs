@@ -55,8 +55,16 @@ async fn run(
         // Draw frame
         terminal.draw(|frame| ui::render(&mut app, frame))?;
 
-        // Handle event
-        match events.next()? {
+        // Animation has its own wakeup; it never accelerates worker/status ticks.
+        let event = if app.animation_active() {
+            events.next_timeout(Duration::from_millis(33))?
+        } else {
+            Some(events.next()?)
+        };
+        let Some(event) = event else {
+            continue;
+        };
+        match event {
             Event::Key(key) => app.handle_key(key),
             Event::Mouse(_mouse) => {
                 // Mouse support: future enhancement

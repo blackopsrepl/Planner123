@@ -39,6 +39,39 @@ all                  ▌Holiday
 
 `Inner` (10:00-10:30) overlaps `Long` (09:00-11:00), so it gets its own lane.
 
+## Effects and proposal preview
+
+The calendar/sidebar shell stays in place. Ambient decorations only occupy
+empty cells; edge fades affect decorative stars, never event text. Calendar
+entry wipes settle on rapid navigation and cancel on resize. The status chip
+flash follows the registry action, including paired `j/k` bindings.
+
+```text
+┌ Calendars ┐┌ Planner Inbox ─────────────────────────────────────┐
+│ [x] Work  ││ > Write report     60m                             │
+│ Projects  │├ Selected Task ─────────────────────────────────────┤
+│           ││ Calendar, priority, constraints, task ID           │
+│           │├ Proposal preview · dashed = not applied · A applies┤
+│           ││ GHOST / ready · 2/2 scheduled · Europe/Rome         │
+│           ││       Mon 02 Nov      Tue 03 Nov                    │
+│           ││ 09:00 ┊Write report  ▌Existing meeting             │
+│           ││ 09:30 ┊              ┊Review                        │
+└───────────┘└────────────────────────────────────────────────────┘
+```
+
+Dates, labels and placements come from the actual proposal, not this example.
+Existing recurring occurrences and proposed slots share the working calendar's
+overlap-lane allocator. Offscreen targets do not launch flights. Selection
+anchors the preview; after successful apply and matching loaded IDs the rails
+are solid, with bounded sweeps/ripples. No fake queue replaces the sidebar.
+
+Palette `Effects: all [ON/OFF]` and `Effect: <name> [ON/OFF]` persist master,
+native-layer and all 37 glyphfx switches. `Credits and glyphfx gallery` opens a
+dedicated surface with a terminal-cell sine scroller, animated braille logo
+and automatic gallery playback; left/right browse and Escape closes. This is
+not the help screen and never opens on startup. Master-off cancels motion but
+retains the complete normal UI, including the proposal preview.
+
 ## Overlay surfaces
 
 - Google management: connection state, imported calendar health, pending outbound work, conflicts, and discoverable calendars for import

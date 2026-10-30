@@ -5,7 +5,7 @@ timed event as a calendar-coloured rail block placed by `layout::layout_day`.
 All-day events sit in a strip above the hours instead of covering the day. */
 
 mod all_day;
-mod layout;
+pub(crate) mod layout;
 
 use chrono::{Duration, Local, NaiveDate, Timelike};
 use ratatui::{
@@ -204,6 +204,7 @@ fn render_event(
     }
     frame.render_widget(Clear, area);
     frame.render_widget(Paragraph::new(lines), area);
+    super::success_accent::render(app, frame, area, Some(&ev.id), window.area);
 }
 
 /* A cluster too wide for its column: lane 0 draws one `+N` marker (N is the

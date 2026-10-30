@@ -104,6 +104,9 @@ pub enum Action {
     ScrollPageUp,
     ScrollPageDown,
 
+    ToggleEffect(String),
+    Credits,
+
     // ── Misc ─────────────────────────────────────────────────────
     Escape,
     None,
@@ -115,8 +118,8 @@ pub type Hint = (&'static str, &'static str);
 mod registry;
 
 pub use registry::{
-    bar_hints, bar_hints_within, contexts, help_sections, help_sections_for, hint_width, rows,
-    section_of, tables, Binding, Context, Key, Section, CONTROL,
+    action_hint, bar_hints, bar_hints_within, contexts, help_sections, help_sections_for,
+    hint_width, rows, section_of, tables, Binding, Context, Key, Section, CONTROL,
 };
 
 /* Case-insensitive subsequence match, used by the palette and the help filter:
