@@ -24,8 +24,7 @@ pub fn render_google_manage(app: &App, frame: &mut Frame) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let auth_status = crate::google::auth::auth_status();
-    let state_label = match auth_status.state {
+    let state_label = match app.google_auth.state {
         crate::google::auth::GoogleAuthState::Connected => "connected",
         crate::google::auth::GoogleAuthState::NeedsReauth => "needs reauth",
         crate::google::auth::GoogleAuthState::Disconnected => "disconnected",

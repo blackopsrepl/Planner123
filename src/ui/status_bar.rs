@@ -44,7 +44,7 @@ pub fn render_header(app: &App, frame: &mut Frame, area: Rect) {
     };
 
     // Google sync indicator
-    let google_badge = if crate::google::auth::GoogleClient::is_configured() {
+    let google_badge = if app.google_auth.has_refresh_token {
         " \u{f09b}"
     } else {
         ""
@@ -101,7 +101,7 @@ pub fn render_status_bar(app: &App, frame: &mut Frame, area: Rect) {
             .values()
             .map(|state| state.pending_conflicts)
             .sum();
-        let (google_state, style) = match crate::google::auth::auth_status().state {
+        let (google_state, style) = match app.google_auth.state {
             crate::google::auth::GoogleAuthState::Disconnected => {
                 ("google off".to_string(), t.dimmed())
             }

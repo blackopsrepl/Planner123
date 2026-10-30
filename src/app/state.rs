@@ -161,6 +161,8 @@ pub struct App {
     pub google_auth_client_secret: String,
     pub google_auth_field: usize, // 0 = client_id, 1 = client_secret
     pub google_client: Option<Arc<crate::google::auth::GoogleClient>>,
+    /// Read from the keyring only when it can change; every draw reads this copy.
+    pub google_auth: crate::google::auth::GoogleAuthStatus,
     pub google_discovered_calendars: Vec<DiscoveredGoogleCalendar>,
     pub google_discovery_index: usize,
 
@@ -260,6 +262,7 @@ impl App {
             google_auth_client_secret: String::new(),
             google_auth_field: 0,
             google_client: None,
+            google_auth: crate::google::auth::auth_status(),
             google_discovered_calendars: Vec::new(),
             google_discovery_index: 0,
             pending_confirm: None,

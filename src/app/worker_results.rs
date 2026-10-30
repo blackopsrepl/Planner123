@@ -110,6 +110,7 @@ impl App {
             }
             WorkerResult::GoogleAuthComplete(client) => {
                 self.google_client = Some(client);
+                self.refresh_google_auth();
                 self.set_status("Google authorization complete.", false);
                 self.view = View::GoogleManage;
                 self.worker.load_calendar_sync_states();

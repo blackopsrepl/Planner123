@@ -74,7 +74,13 @@ impl App {
 
     // ── Google ────────────────────────────────────────────────────
 
+    /// Each keyring read is a Secret Service round trip; never do one per frame.
+    pub(super) fn refresh_google_auth(&mut self) {
+        self.google_auth = crate::google::auth::auth_status();
+    }
+
     pub(super) fn google_manage(&mut self) {
+        self.refresh_google_auth();
         if self.google_client.is_some() {
             self.view = View::GoogleManage;
             if self.google_discovered_calendars.is_empty() {
@@ -133,7 +139,8 @@ impl App {
 
     pub(super) fn google_logout(&mut self) {
         match crate::google::auth::GoogleClient::logout() {
-            Ok(_) => {
+            Ok(status) => {
+                self.google_auth = status;
                 self.google_client = None;
                 self.google_discovered_calendars.clear();
                 let return_view = self.return_view.clone();
