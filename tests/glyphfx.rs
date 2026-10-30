@@ -28,8 +28,9 @@ fn frames(effect: &str) -> Vec<Buffer> {
 }
 
 #[test]
-fn all37_real_styled_buffers_complete_and_interleave() {
-    assert_eq!(EFFECTS.len(), 37);
+fn every_effect_real_styled_buffers_complete_and_interleave() {
+    assert_eq!(EFFECTS, ::glyphfx::EFFECTS);
+    assert!(EFFECTS.ends_with(::glyphfx::ORIGINALS));
     for &effect in EFFECTS {
         let expected = frames(effect);
         let mut actual = Clip::new(effect, "GLYPH FX\nPlanner", 16, 6).unwrap();

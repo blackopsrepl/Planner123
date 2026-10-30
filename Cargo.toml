@@ -8,8 +8,8 @@ default-run = "planner123"
 
 [dependencies]
 # Text effects; the C engine and all unsafe code live in glyphfx's own crates.
-# Pinned to blackopsrepl/glyphfx#2 until glyphfx publishes to crates.io.
-glyphfx = { git = "https://github.com/blackopsrepl/glyphfx", rev = "2b4be1e19babb9f039f3b5f6b8ab20005ebe692a" }
+# Pinned to the glyphfx v0.4.0 tag until glyphfx publishes to crates.io.
+glyphfx = { git = "https://github.com/blackopsrepl/glyphfx", tag = "v0.4.0" }
 vte = "0.15"
 # TUI
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }

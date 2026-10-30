@@ -174,7 +174,7 @@ fn actual_palette_registry_feedback_resize_and_credits_controls() {
     let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     terminal.draw(|f| ui::render(&mut app, f)).unwrap();
     assert!(app.animation_active());
-    assert_eq!(planner123::glyphfx::EFFECTS.len(), 37);
+    assert_eq!(planner123::glyphfx::EFFECTS, ::glyphfx::EFFECTS);
     for index in 0..planner123::glyphfx::EFFECTS.len() {
         if index > 0 {
             app.handle_key(crossterm::event::KeyEvent::new(

@@ -1032,7 +1032,7 @@ dependencies = [
 [[package]]
 name = "glyphfx"
 version = "0.1.0"
-source = "git+https://github.com/blackopsrepl/glyphfx?rev=2b4be1e19babb9f039f3b5f6b8ab20005ebe692a#2b4be1e19babb9f039f3b5f6b8ab20005ebe692a"
+source = "git+https://github.com/blackopsrepl/glyphfx?tag=v0.4.0#acdd1c89fb2b59505dc5c03332e2d5296fdf22d6"
 dependencies = [
  "glyphfx-sys",
 ]
@@ -1040,7 +1040,7 @@ dependencies = [
 [[package]]
 name = "glyphfx-sys"
 version = "0.1.0"
-source = "git+https://github.com/blackopsrepl/glyphfx?rev=2b4be1e19babb9f039f3b5f6b8ab20005ebe692a#2b4be1e19babb9f039f3b5f6b8ab20005ebe692a"
+source = "git+https://github.com/blackopsrepl/glyphfx?tag=v0.4.0#acdd1c89fb2b59505dc5c03332e2d5296fdf22d6"
 dependencies = [
  "cc",
 ]
