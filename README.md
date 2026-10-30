@@ -57,9 +57,8 @@ Press `1`–`4` to switch views:
 
 ### Native terminal effects
 
-Effects are on by default: eased manual agenda scrolling, pressed key chips, and
-short entry wipes. Calendar views have no background decoration and redraw only
-while an effect is running.
+Effects are on by default: subtle month plasma, week/day copper, agenda parallax
+stars, eased manual agenda scrolling, pressed key chips, and short entry wipes.
 Calendar text, selection and popups remain readable; decorations never change
 events, move the actual clock, scroll automatically, or delay a worker operation.
 

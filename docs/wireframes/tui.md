@@ -41,8 +41,9 @@ all                  ▌Holiday
 
 ## Effects and proposal preview
 
-The calendar/sidebar shell stays in place. Calendar views carry no background
-decoration; the entry wipe only styles empty cells, never event text. Calendar
+The calendar/sidebar shell stays in place. Background tints sit evenly under
+every plain cell, glyphs included, and never touch selections or event fills.
+Agenda stars stay two cells clear of any text; edge fades dim them at the edges. Calendar
 entry wipes settle on rapid navigation and cancel on resize. The status chip
 flash follows the registry action, including paired `j/k` bindings.
 

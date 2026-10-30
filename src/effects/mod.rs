@@ -106,8 +106,10 @@ impl Effects {
         }
         let calendar = matches!(view, View::Month | View::Week | View::Day | View::Agenda);
         (matches!(view, View::Agenda)
-            && self.on("agenda easing")
-            && self.scroll.2.elapsed().as_secs_f32() < 0.18)
+            && (self.on("agenda stars")
+                || (self.on("agenda easing") && self.scroll.2.elapsed().as_secs_f32() < 0.18)))
+            || (matches!(view, View::Month) && self.on("plasma"))
+            || (matches!(view, View::Week | View::Day) && self.on("copper"))
             || (calendar && self.on("view reveal") && Self::age(self.reveal) < 0.32)
             || (self.on("pressed chips")
                 && self

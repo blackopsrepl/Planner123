@@ -1,37 +1,109 @@
 use super::Effects;
 use crate::{keys::View, theme::theme};
-use ratatui::{buffer::Buffer, layout::Rect, style::Color};
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    style::{Color, Modifier},
+};
+use unicode_width::UnicodeWidthStr;
 
-// Calendar views carry no ambient background: a decorated canvas costs
-// readability and keeps the app redrawing. The only layer here is the short
-// entry wipe, and it only ever styles empty cells, never a glyph or a fill.
+// Canonical UI is drawn first; decorations never replace a glyph or a semantic
+// fill. A background tint covers every plain cell, glyphs included: tinting only
+// blank cells leaves each letter, border and hour line in a dark cut-out.
 pub fn composite(fx: &Effects, view: &View, buffer: &mut Buffer, area: Rect) {
-    if !fx.on("view reveal")
-        || Effects::age(fx.reveal) >= 0.32
+    if !fx.preferences.enabled
         || !matches!(view, View::Month | View::Week | View::Day | View::Agenda)
     {
         return;
     }
-    let t = theme();
-    let inner = area.inner(ratatui::layout::Margin::new(1, 1));
-    let x = inner.x + (inner.width as f32 * Effects::age(fx.reveal) / 0.32) as u16;
-    if x >= inner.right() {
+    let tint = match view {
+        View::Month => fx.on("plasma"),
+        View::Week | View::Day => fx.on("copper"),
+        _ => false,
+    };
+    let stars = matches!(view, View::Agenda) && fx.on("agenda stars");
+    let reveal = fx.on("view reveal") && Effects::age(fx.reveal) < 0.32;
+    if !(tint || stars || reveal) {
         return;
     }
+    let t = theme();
+    let time = fx.started.elapsed().as_secs_f32();
+    let inner = area.inner(ratatui::layout::Margin::new(1, 1));
+    let plain = |c: &ratatui::buffer::Cell| {
+        (c.bg == Color::Reset || c.bg == t.background) && !c.modifier.contains(Modifier::REVERSED)
+    };
+    // Stars are placed against the canonical frame, so one star never blocks the
+    // cell its neighbour fades into.
+    let mut lit = Vec::new();
     for y in inner.y..inner.bottom() {
-        if x > buffer.area.x
-            && unicode_width::UnicodeWidthStr::width(buffer[(x - 1, y)].symbol()) > 1
-        {
-            continue;
-        }
-        let c = &mut buffer[(x, y)];
-        if c.symbol() == " "
-            && c.modifier.is_empty()
-            && (c.bg == t.background || c.bg == Color::Reset)
-        {
-            c.set_bg(blend(t.background, t.accent, 0.16));
+        for x in inner.x..inner.right() {
+            if tint && plain(&buffer[(x, y)]) {
+                let w = if matches!(view, View::Month) {
+                    ((x as f32 * 0.09 + time * 0.4).sin() + (y as f32 * 0.3 - time * 0.5).sin())
+                        * 0.5
+                } else {
+                    (y as f32 * 0.4 - time * 0.7).sin()
+                };
+                buffer[(x, y)].set_bg(blend(t.background, t.accent, 0.025 + (w + 1.) * 0.025));
+            }
+            if stars {
+                lit.extend(star(buffer, inner, x, y, time));
+            }
         }
     }
+    for (x, y, light, layer) in lit {
+        let edge = (y == inner.y || y + 1 == inner.bottom()) && fx.on("edge fades");
+        let peak = if edge { 0.15 } else { 0.38 };
+        let cell = &mut buffer[(x, y)];
+        cell.set_symbol(if layer == 0 { "·" } else { "⋅" });
+        cell.set_fg(blend(t.background, t.accent, peak * light));
+    }
+    if reveal {
+        // Style-only wipe: no intermediate frame ever hides working calendar data.
+        let x = inner.x + (inner.width as f32 * Effects::age(fx.reveal) / 0.32) as u16;
+        if x < inner.right() {
+            for y in inner.y..inner.bottom() {
+                if plain(&buffer[(x, y)]) {
+                    buffer[(x, y)].set_bg(blend(t.background, t.accent, 0.16));
+                }
+            }
+        }
+    }
+}
+
+/// A cell a star may occupy: empty, not the tail of a wide glyph, and at least
+/// two empty cells clear of any text, so stars never sit between or beside words.
+fn blank(buffer: &Buffer, inner: Rect, x: u16, y: u16) -> bool {
+    let empty = |x: u16| {
+        x < inner.x
+            || x >= inner.right()
+            || (buffer[(x, y)].symbol() == " "
+                && (x == buffer.area.x || buffer[(x - 1, y)].symbol().width() <= 1))
+    };
+    (x.saturating_sub(2)..=x.saturating_add(2)).all(empty)
+}
+
+/// Three parallax layers drifting left. A star sits at a fractional column and
+/// is shared between the two cells it straddles, so it glides instead of
+/// jumping a whole cell at a time.
+fn star(buffer: &Buffer, inner: Rect, x: u16, y: u16, time: f32) -> Option<(u16, u16, f32, u32)> {
+    let mut best = (0f32, 0u32);
+    for layer in 0..3u32 {
+        let travel = time * (0.35 + layer as f32 * 0.5);
+        let (whole, frac) = (travel.floor() as u32, travel.fract());
+        let lit = |k: u32| {
+            ((k.wrapping_mul(73856093))
+                ^ (y as u32).wrapping_mul(19349663)
+                ^ layer.wrapping_mul(83492791))
+            .is_multiple_of(337)
+        };
+        let k = x as u32 + whole;
+        let light = (1. - frac) * lit(k) as u8 as f32 + frac * lit(k + 1) as u8 as f32;
+        if light > best.0 {
+            best = (light, layer);
+        }
+    }
+    (best.0 >= 0.08 && blank(buffer, inner, x, y)).then_some((x, y, best.0, best.1))
 }
 
 pub fn blend(base: Color, accent: Color, amount: f32) -> Color {

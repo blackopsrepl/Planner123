@@ -55,19 +55,14 @@ fn every_native_and_engine_toggle_defaults_on_and_persists() {
 }
 
 #[test]
-fn reveal_wipe_preserves_unicode_selection_and_borders() {
+fn ambient_layers_keep_glyphs_and_fills_and_tint_evenly() {
     let _lock = common::serial_guard();
     let _dir = isolated();
     let mut fx = Effects::default();
+    fx.started = Instant::now() - Duration::from_secs(4);
+    fx.reveal = None;
     for view in [View::Month, View::Week, View::Day, View::Agenda] {
-        // Settled: calendar views draw no background decoration.
-        fx.reveal = None;
         let area = Rect::new(3, 2, 90, 30);
-        let mut settled = Buffer::empty(Rect::new(0, 0, 100, 40));
-        planner123::effects::layers::composite(&fx, &view, &mut settled, area);
-        assert_eq!(settled, Buffer::empty(Rect::new(0, 0, 100, 40)), "{view:?}");
-        // Mid-wipe, on the column holding the wide glyphs.
-        fx.reveal = Some(Instant::now() - Duration::from_millis(14));
         let mut buffer = Buffer::empty(Rect::new(0, 0, 100, 40));
         buffer.set_string(
             7,
@@ -84,16 +79,23 @@ fn reveal_wipe_preserves_unicode_selection_and_borders() {
         planner123::effects::layers::composite(&fx, &view, &mut buffer, area);
         for y in 0..40 {
             for x in 0..100 {
-                let c = &before[(x, y)];
-                if c.symbol() != " "
-                    || !c.modifier.is_empty()
-                    || c.bg == Color::Blue
+                let (c, now) = (&before[(x, y)], &buffer[(x, y)]);
+                // A semantic fill is never touched; a glyph keeps symbol and style
+                // while a tint may sit under it.
+                if c.bg == Color::Blue {
+                    assert_eq!(now, c, "fill {view:?} at {x},{y}");
+                } else if c.symbol() != " "
                     || (x > 0
                         && unicode_width::UnicodeWidthStr::width(before[(x - 1, y)].symbol()) > 1)
                 {
-                    assert_eq!(&buffer[(x, y)], c, "protected {view:?} at {x},{y}");
+                    let kept = (now.symbol(), now.fg, now.modifier);
+                    assert_eq!(kept, (c.symbol(), c.fg, c.modifier), "{view:?} at {x},{y}");
                 }
             }
+        }
+        if matches!(view, View::Week | View::Day) {
+            // Even tint: a glyph shares the background of the blank beside it.
+            assert_eq!(buffer[(7, 7)].bg, buffer[(6, 7)].bg, "{view:?} cut-out");
         }
         fx.preferences.enabled = false;
         let mut disabled = before.clone();
@@ -109,14 +111,9 @@ fn scheduler_stops_hidden_disabled_and_finished_layers() {
     let _dir = isolated();
     let mut fx = Effects::default();
     fx.reveal = None;
-    fx.scroll.2 = Instant::now() - Duration::from_secs(1);
-    // A settled calendar view schedules no frames at all.
-    for view in [View::Month, View::Week, View::Day, View::Agenda, View::Help] {
-        assert!(!fx.active(&view), "{view:?}");
-    }
-    fx.scroll.2 = Instant::now();
     assert!(fx.active(&View::Agenda));
-    fx.scroll.2 = Instant::now() - Duration::from_secs(1);
+    assert!(fx.active(&View::Month));
+    assert!(!fx.active(&View::Help));
     for name in NATIVE {
         fx.preferences.individual.insert((*name).into(), false);
     }
