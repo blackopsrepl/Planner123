@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.12](https://github.com/blackopsrepl/Planner123/compare/v0.6.11...v0.6.12) (2026-10-30)
+
+
+### Bug Fixes
+
+* **effects:** move the agenda stars at the Planner06 speed ([076363b](https://github.com/blackopsrepl/Planner123/commit/076363baaf236f890d3ed79d6010e72daaa391b9))
+
+
 ## [0.6.11](https://github.com/blackopsrepl/Planner123/compare/v0.6.10...v0.6.11) (2026-10-30)
 
 
