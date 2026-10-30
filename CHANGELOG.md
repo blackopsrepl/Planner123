@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.9](https://github.com/blackopsrepl/Planner123/compare/v0.6.8...v0.6.9) (2026-10-30)
+
+
+### Bug Fixes
+
+* **effects:** give glyphfx copper its own toggle ([1150f39](https://github.com/blackopsrepl/Planner123/commit/1150f39e6b645c3eca1a114928ce76601c04eb14))
+
+
 ## [0.6.8](https://github.com/blackopsrepl/Planner123/compare/v0.6.7...v0.6.8) (2026-10-30)
 
 
