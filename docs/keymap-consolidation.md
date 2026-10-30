@@ -139,9 +139,9 @@ Consequences, in the plainest terms:
 
 `build_help_lines()` emits ~90 rendered rows into `centered_rect(70, 85, …)`:
 ~40 usable rows on a 50-row terminal, ~22 on a 24-row terminal. The published
-screenshot (`assets/screenshot-help.png`) shows exactly this — GLOBAL, MONTH,
-WEEK/DAY and one row of AGENDA, and the remaining eight sections are below the
-fold. Reading the cheat sheet requires the cheat sheet's own keys.
+screenshot (`assets/screenshot-help.png`, 160×45) shows exactly this — MONTH
+VIEW, GLOBAL, WEEK VIEW and the top of DAY VIEW, and every later section is
+below the fold. Reading the cheat sheet requires the cheat sheet's own keys.
 `help_scroll` is also never reset when the overlay is reopened
 (`src/app/state.rs:224` — set once at startup).
 
