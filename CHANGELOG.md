@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.8](https://github.com/blackopsrepl/Planner123/compare/v0.6.7...v0.6.8) (2026-10-30)
+
+
+### Features
+
+* **effects:** render glyphfx text effects into ratatui buffers ([baae6a2](https://github.com/blackopsrepl/Planner123/commit/baae6a23b977477abc6697b1d10be224a1c3e99c))
+* **tui:** bring the Planner06 demoscene effects into the real app ([ecc114a](https://github.com/blackopsrepl/Planner123/commit/ecc114a227560074b73979839340bf43104cbec2))
+
+
+### Bug Fixes
+
+* **db:** serialize concurrent first-launch initialization ([757ee60](https://github.com/blackopsrepl/Planner123/commit/757ee60d08c958d8b1d37ff2db66dfd54500f668))
+* **tui:** keep worker ticks independent of input and frame deadlines ([e149f6f](https://github.com/blackopsrepl/Planner123/commit/e149f6ffbd3d1dc735f84176ca42ac6dbfdd018e))
+
+
 ## [0.6.7](https://github.com/blackopsrepl/Planner123/compare/v0.6.6...v0.6.7) (2026-10-29)
 
 
