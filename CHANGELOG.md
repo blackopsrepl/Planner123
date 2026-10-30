@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.6.11](https://github.com/blackopsrepl/Planner123/compare/v0.6.10...v0.6.11) (2026-10-30)
+
+
+### Bug Fixes
+
+* **effects:** bring the background layers back, tinted evenly ([b4c6fee](https://github.com/blackopsrepl/Planner123/commit/b4c6fee3d46ee2dcd15506d88bc3a300d860a0b0))
+* **tui:** stop reading the keyring on every frame ([ccdae1e](https://github.com/blackopsrepl/Planner123/commit/ccdae1e5b959963c50562eacaa57a6d40d1012b9))
+
+
 ## [0.6.10](https://github.com/blackopsrepl/Planner123/compare/v0.6.9...v0.6.10) (2026-10-30)
 
 
