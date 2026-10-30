@@ -55,14 +55,19 @@ fn every_native_and_engine_toggle_defaults_on_and_persists() {
 }
 
 #[test]
-fn ambient_layers_preserve_unicode_selection_and_borders() {
+fn reveal_wipe_preserves_unicode_selection_and_borders() {
     let _lock = common::serial_guard();
     let _dir = isolated();
     let mut fx = Effects::default();
-    fx.started = Instant::now() - Duration::from_secs(4);
-    fx.reveal = None;
     for view in [View::Month, View::Week, View::Day, View::Agenda] {
+        // Settled: calendar views draw no background decoration.
+        fx.reveal = None;
         let area = Rect::new(3, 2, 90, 30);
+        let mut settled = Buffer::empty(Rect::new(0, 0, 100, 40));
+        planner123::effects::layers::composite(&fx, &view, &mut settled, area);
+        assert_eq!(settled, Buffer::empty(Rect::new(0, 0, 100, 40)), "{view:?}");
+        // Mid-wipe, on the column holding the wide glyphs.
+        fx.reveal = Some(Instant::now() - Duration::from_millis(14));
         let mut buffer = Buffer::empty(Rect::new(0, 0, 100, 40));
         buffer.set_string(
             7,
@@ -104,9 +109,14 @@ fn scheduler_stops_hidden_disabled_and_finished_layers() {
     let _dir = isolated();
     let mut fx = Effects::default();
     fx.reveal = None;
+    fx.scroll.2 = Instant::now() - Duration::from_secs(1);
+    // A settled calendar view schedules no frames at all.
+    for view in [View::Month, View::Week, View::Day, View::Agenda, View::Help] {
+        assert!(!fx.active(&view), "{view:?}");
+    }
+    fx.scroll.2 = Instant::now();
     assert!(fx.active(&View::Agenda));
-    assert!(fx.active(&View::Month));
-    assert!(!fx.active(&View::Help));
+    fx.scroll.2 = Instant::now() - Duration::from_secs(1);
     for name in NATIVE {
         fx.preferences.individual.insert((*name).into(), false);
     }

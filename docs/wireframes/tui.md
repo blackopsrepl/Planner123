@@ -41,8 +41,8 @@ all                  ▌Holiday
 
 ## Effects and proposal preview
 
-The calendar/sidebar shell stays in place. Ambient decorations only occupy
-empty cells; edge fades affect decorative stars, never event text. Calendar
+The calendar/sidebar shell stays in place. Calendar views carry no background
+decoration; the entry wipe only styles empty cells, never event text. Calendar
 entry wipes settle on rapid navigation and cancel on resize. The status chip
 flash follows the registry action, including paired `j/k` bindings.
 

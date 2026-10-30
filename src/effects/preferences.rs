@@ -2,24 +2,20 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
 
 pub const NATIVE: &[&str] = &[
-    "agenda stars",
     "agenda easing",
-    "edge fades",
     "pressed chips",
     "view reveal",
     "proposal reveal",
     "apply sweep",
     "landing ripples",
-    "copper",
-    "plasma",
     "task flights",
     "sine scroller",
     "ouroboros",
 ];
 
-/// The preference key that toggles a glyphfx effect. glyphfx's `copper` shares
-/// its name with the native copper bars, so an engine name that collides with a
-/// native one gets a `glyphfx ` prefix and the two toggle independently.
+/// The preference key that toggles a glyphfx effect. An engine name that
+/// collides with a native one gets a `glyphfx ` prefix, so the two toggle
+/// independently.
 pub fn engine_toggle(effect: &str) -> String {
     if NATIVE.contains(&effect) {
         format!("glyphfx {effect}")
