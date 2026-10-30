@@ -17,6 +17,17 @@ pub const NATIVE: &[&str] = &[
     "ouroboros",
 ];
 
+/// The preference key that toggles a glyphfx effect. glyphfx's `copper` shares
+/// its name with the native copper bars, so an engine name that collides with a
+/// native one gets a `glyphfx ` prefix and the two toggle independently.
+pub fn engine_toggle(effect: &str) -> String {
+    if NATIVE.contains(&effect) {
+        format!("glyphfx {effect}")
+    } else {
+        effect.to_owned()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Preferences {

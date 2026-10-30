@@ -5,7 +5,7 @@ pub mod brand;
 pub mod credits;
 pub mod layers;
 mod preferences;
-pub use preferences::{Preferences, NATIVE};
+pub use preferences::{engine_toggle, Preferences, NATIVE};
 
 pub struct Effects {
     pub preferences: Preferences,
@@ -62,6 +62,10 @@ impl Effects {
     pub fn on(&self, name: &str) -> bool {
         self.preferences.on(name)
     }
+    /// Whether the glyphfx effect named `effect` is enabled.
+    pub fn engine_on(&self, effect: &str) -> bool {
+        self.on(&engine_toggle(effect))
+    }
     pub fn age(mark: Option<Instant>) -> f32 {
         mark.map(|t| t.elapsed().as_secs_f32())
             .unwrap_or(f32::INFINITY)
@@ -98,7 +102,7 @@ impl Effects {
         if self.credits {
             return self.on("sine scroller")
                 || self.on("ouroboros")
-                || crate::glyphfx::EFFECTS.iter().any(|e| self.on(e));
+                || crate::glyphfx::EFFECTS.iter().any(|e| self.engine_on(e));
         }
         let calendar = matches!(view, View::Month | View::Week | View::Day | View::Agenda);
         (matches!(view, View::Agenda)

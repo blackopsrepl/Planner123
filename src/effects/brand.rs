@@ -26,7 +26,7 @@ pub fn render(fx: &mut Effects, view: &View, frame: &mut Frame, header: Rect) {
         fx.clip_frame = None;
         return;
     };
-    if !fx.on(effect) {
+    if !fx.engine_on(effect) {
         return;
     }
     let area = Rect::new(header.x + 5, header.y, 10, 1);

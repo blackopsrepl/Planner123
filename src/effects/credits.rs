@@ -65,7 +65,7 @@ pub fn render(fx: &mut Effects, frame: &mut Frame, area: Rect) {
     let enabled: Vec<&str> = glyphfx::EFFECTS
         .iter()
         .copied()
-        .filter(|e| fx.on(e))
+        .filter(|e| fx.engine_on(e))
         .collect();
     let gallery = Rect::new(
         inner.x,

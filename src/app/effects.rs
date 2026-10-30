@@ -1,6 +1,6 @@
 use super::palette::Command;
 use super::*;
-use crate::effects::{Effects, NATIVE};
+use crate::effects::{engine_toggle, Effects, NATIVE};
 use std::time::Instant;
 
 impl App {
@@ -27,18 +27,19 @@ impl App {
         commands.extend(
             NATIVE
                 .iter()
-                .chain(crate::glyphfx::EFFECTS.iter())
+                .map(|name| (*name).to_owned())
+                .chain(crate::glyphfx::EFFECTS.iter().map(|e| engine_toggle(e)))
                 .map(|name| Command {
                     label: format!(
                         "Effect: {name} [{}]",
-                        if pref.individual.get(*name).copied().unwrap_or(true) {
+                        if pref.individual.get(&name).copied().unwrap_or(true) {
                             "ON"
                         } else {
                             "OFF"
                         }
                     )
                     .into(),
-                    action: Action::ToggleEffect((*name).into()),
+                    action: Action::ToggleEffect(name),
                 }),
         );
         commands
@@ -78,7 +79,7 @@ impl App {
             KeyCode::Right | KeyCode::Left => {
                 let n = crate::glyphfx::EFFECTS
                     .iter()
-                    .filter(|e| self.effects.on(e))
+                    .filter(|e| self.effects.engine_on(e))
                     .count();
                 if n > 0 {
                     self.effects.gallery_index = (self.effects.gallery_index

@@ -1,6 +1,6 @@
 mod common;
 use planner123::{
-    effects::{Effects, Preferences, NATIVE},
+    effects::{engine_toggle, Effects, Preferences, NATIVE},
     keys::{Action, View},
     ui,
 };
@@ -30,13 +30,22 @@ fn every_native_and_engine_toggle_defaults_on_and_persists() {
     let _dir = isolated();
     let mut pref = Preferences::load();
     assert!(pref.enabled);
-    for name in NATIVE.iter().chain(planner123::glyphfx::EFFECTS.iter()) {
+    let toggles: Vec<String> = NATIVE
+        .iter()
+        .map(|n| (*n).to_owned())
+        .chain(
+            planner123::glyphfx::EFFECTS
+                .iter()
+                .map(|e| engine_toggle(e)),
+        )
+        .collect();
+    for name in &toggles {
         assert!(pref.on(name), "{name}");
-        pref.individual.insert((*name).into(), false);
+        pref.individual.insert(name.clone(), false);
     }
     pref.save().unwrap();
     let loaded = Preferences::load();
-    for name in NATIVE.iter().chain(planner123::glyphfx::EFFECTS.iter()) {
+    for name in &toggles {
         assert!(!loaded.on(name), "{name}");
     }
     assert!(loaded.enabled);
