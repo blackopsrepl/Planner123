@@ -47,7 +47,13 @@ pub fn composite(fx: &Effects, view: &View, buffer: &mut Buffer, area: Rect) {
                 buffer[(x, y)].set_bg(blend(t.background, t.accent, 0.025 + (w + 1.) * 0.025));
             }
             if stars {
-                lit.extend(star(buffer, inner, x, y, time));
+                lit.extend(star(
+                    buffer,
+                    inner,
+                    x,
+                    y,
+                    fx.started.elapsed().as_secs_f64(),
+                ));
             }
         }
     }
@@ -83,22 +89,28 @@ fn blank(buffer: &Buffer, inner: Rect, x: u16, y: u16) -> bool {
     (x.saturating_sub(2)..=x.saturating_add(2)).all(empty)
 }
 
-/// Three parallax layers drifting left. A star sits at a fractional column and
-/// is shared between the two cells it straddles, so it glides instead of
-/// jumping a whole cell at a time.
-fn star(buffer: &Buffer, inner: Rect, x: u16, y: u16, time: f32) -> Option<(u16, u16, f32, u32)> {
+/// Depth of the three parallax layers. As in the Planner06 starfield, a star
+/// drifts left at 14 cells a second times its depth, and nearer stars are brighter.
+const DEPTH: [f32; 3] = [0.25, 0.625, 1.0];
+
+/// A star sits at a fractional column and is shared between the two cells it
+/// straddles, so it glides instead of jumping a whole cell at a time. Travel is
+/// f64: in f32 the sub-cell fraction is lost after about a day of uptime.
+fn star(buffer: &Buffer, inner: Rect, x: u16, y: u16, time: f64) -> Option<(u16, u16, f32, u32)> {
     let mut best = (0f32, 0u32);
     for layer in 0..3u32 {
-        let travel = time * (0.35 + layer as f32 * 0.5);
-        let (whole, frac) = (travel.floor() as u32, travel.fract());
+        let travel = time * 14.0 * DEPTH[layer as usize] as f64;
+        let (whole, frac) = (travel.floor() as u64 as u32, travel.fract() as f32);
         let lit = |k: u32| {
             ((k.wrapping_mul(73856093))
                 ^ (y as u32).wrapping_mul(19349663)
                 ^ layer.wrapping_mul(83492791))
             .is_multiple_of(337)
         };
-        let k = x as u32 + whole;
-        let light = (1. - frac) * lit(k) as u8 as f32 + frac * lit(k + 1) as u8 as f32;
+        let k = (x as u32).wrapping_add(whole);
+        let light = ((1. - frac) * lit(k) as u8 as f32
+            + frac * lit(k.wrapping_add(1)) as u8 as f32)
+            * (0.4 + 0.6 * DEPTH[layer as usize]);
         if light > best.0 {
             best = (light, layer);
         }
